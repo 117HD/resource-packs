@@ -1,0 +1,20 @@
+name: 🚧 Manifest Updater
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  gradle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout project sources
+        uses: actions/checkout@v3
+      - name: 📂 Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      - name: 🗃️ Adding Permissions
+        id: gradleperm
+        run: chmod +x gradlew
+      - name: 🗃️ Updating Manifest
+        id: gradle
+        run: ./gradlew update-manifest -Ptoken=${{ secrets.ACCESS_TOKEN }} -Pdiscord=${{ secrets.DISCORD_WEBHOOK }} -stacktrace
