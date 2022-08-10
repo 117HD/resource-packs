@@ -7,4 +7,22 @@
   "link": "https://github.com/Mark7625/resource-packs",
   "support": "https://github.com/Mark7625/resource-packs/issues",
   "tags": ["Textures", "Minecraft"]
+}, {
+  "author": "Mark7625",
+  "commit": "567e45162beccf9cffdce49f54c0c713b32ab4b1",
+  "description": "Example Pack",
+  "hasIcon": false,
+  "internalName": "example_pack",
+  "link": "https://github.com/Mark7625/resource-packs",
+  "support": "https://github.com/Mark7625/resource-packs/issues",
+  "tags": ["Example", "Default"]
+}, {
+  "author": "Mark7625",
+  "commit": "b1e33630909e2ed9f103956a918ad530bd978117",
+  "description": "Large Pack Made just for testing",
+  "hasIcon": false,
+  "internalName": "large_pack",
+  "link": "https://github.com/Mark7625/resource-packs",
+  "support": "https://github.com/Mark7625/resource-packs/issues",
+  "tags": ["Large", "Test"]
 }]
