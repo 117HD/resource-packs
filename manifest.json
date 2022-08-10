@@ -7,13 +7,4 @@
   "link": "https://github.com/Mark7625/resource-packs",
   "support": "https://github.com/Mark7625/resource-packs/issues",
   "tags": ["Textures", "Minecraft"]
-}, {
-  "author": "Mark7625",
-  "commit": "567e45162beccf9cffdce49f54c0c713b32ab4b1",
-  "description": "Example Pack",
-  "hasIcon": false,
-  "internalName": "example_pack",
-  "link": "https://github.com/Mark7625/resource-packs",
-  "support": "https://github.com/Mark7625/resource-packs/issues",
-  "tags": ["Example", "Default"]
 }]
