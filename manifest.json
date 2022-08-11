@@ -1,12 +1,28 @@
-{
-  "minecraft": {
-    "author": "Mark7625",
-    "commit": "b5122d95c60f7f6d4719eb0f91eb7b6f650f0b6b",
-    "description": "Example Pack",
-    "hasIcon": false,
-    "internalName": "minecraft",
-    "link": "https://github.com/Mark7625/resource-packs",
-    "support": "https://github.com/Mark7625/resource-packs/issues",
-    "tags": ["Example", "Default"]
-  }
-}
+[{
+  "author": "Mark7625",
+  "commit": "a952871d660b3bc09c619aedcb9960669a1c3c19",
+  "description": "Make Runescape Look like Minecraft",
+  "hasIcon": true,
+  "internalName": "minecraft",
+  "link": "https://github.com/Mark7625/resource-packs",
+  "support": "https://github.com/Mark7625/resource-packs/issues",
+  "tags": ["Textures", "Minecraft"]
+}, {
+  "author": "Mark7625",
+  "commit": "d84b44efd6507f185ac4c4e3f07e9dde6d6c6be4",
+  "description": "Large Pack Made just for testing",
+  "hasIcon": false,
+  "internalName": "large_pack",
+  "link": "https://github.com/Mark7625/resource-packs",
+  "support": "https://github.com/Mark7625/resource-packs/issues",
+  "tags": ["Large", "Test"]
+}, {
+  "author": "Mark7625",
+  "commit": "e4c6e3dcab3bcc268a070ee4472b87987459ef21",
+  "description": "Example Pack",
+  "hasIcon": false,
+  "internalName": "example_pack",
+  "link": "https://github.com/Mark7625/resource-packs",
+  "support": "https://github.com/Mark7625/resource-packs/issues",
+  "tags": ["Example", "Default"]
+}]
