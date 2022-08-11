@@ -14,5 +14,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("com.beust:klaxon:5.6")
     implementation("org.kohsuke:github-api:1.307")
+    implementation("club.minnced:discord-webhooks:0.8.2")
 }
 
