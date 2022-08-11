@@ -121,7 +121,7 @@ open class ManifestTask : DefaultTask() {
             }
         }
 
-        //updateRepo()
+        updateRepo()
 
         if(project.hasProperty("discord")) {
             sendWebhook()
