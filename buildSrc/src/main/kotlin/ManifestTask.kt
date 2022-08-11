@@ -16,7 +16,7 @@ import org.gradle.api.tasks.TaskAction
 import org.kohsuke.github.GitHub
 import java.awt.Color
 import java.io.File
-import java.net.URL
+import java.io.StringReader
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.system.measureTimeMillis
@@ -67,25 +67,26 @@ open class ManifestTask : DefaultTask() {
     fun generate() {
 
         val time = measureTimeMillis {
+            var repo = ""
             if(File("./packs/").exists()) {
                 File("./packs/").listFiles()?.forEach {
                     val packFile = Properties()
                     packFile.load(it.inputStream())
-                    val repo = packFile.getProperty("repository").substringAfter("https://github.com/")
+                    repo = packFile.getProperty("repository").substringAfter("https://github.com/")
                     val commit = packFile.getProperty("commit")
 
                     val request: Request = Request.Builder().
                         url("${BASE_GUTHUB_LINK}${repo}/commits/${commit}")
                     .build()
 
-                    println("${BASE_GUTHUB_LINK}${repo}/commits/${commit}")
+                    println("${it.name} -  ${BASE_GUTHUB_LINK}${repo}/commits/${commit}")
                     val call: Call = client.newCall(request)
                     val response: Response = call.execute()
                     if (response.code == 200) {
                         toUpdate[it] = response.body.string()
                     } else {
                         failed.add(it.nameWithoutExtension)
-                        System.err.println("Unable to update: ${it.nameWithoutExtension}")
+                        System.err.println("Unable to update: ${it.nameWithoutExtension} Code: ${response.code}")
                     }
                 }
 
@@ -94,7 +95,7 @@ open class ManifestTask : DefaultTask() {
                     withContext(coroutineContext) {
                         toUpdate.forEach {
                             async(Dispatchers.IO) {
-                                val data = getData(it.value)
+                                val data = getData(repo,it.value)
                                 if(data != null) {
                                     finalManifest.add(data)
                                 } else {
@@ -116,7 +117,6 @@ open class ManifestTask : DefaultTask() {
                         "Update manifest.json ${format.format(GregorianCalendar.getInstance().time)}",
                         "manifest"
                     )
-
                 }
             } else {
                 println("No Packs Found")
@@ -129,34 +129,44 @@ open class ManifestTask : DefaultTask() {
 
         println("Manifest Updated in $time ms")
     }
-    private fun getData(content : String): ManifestEntry? {
+    private fun getData(repo : String, content : String): ManifestEntry? {
         val github = Klaxon().parse<Github>(content) ?: return null
 
-        val hasIcon = github.files.any { it.filename == "icon.png" }
-        val propsFileLink = github.files.find { it.filename == "pack.properties" }?.raw_url ?: return null
+        val request: Request = Request.Builder().
+            url("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/pack.properties")
+        .build()
 
-        val properties = Properties()
-        properties.load(URL(propsFileLink).openStream())
+        val response: Response = client.newCall(request).execute()
+        if (response.code == 200) {
 
-        val author = when(properties.contains("author")) {
-            true -> properties.getProperty("author").toString()
-            false -> github.commit.author.name
+            val requestIcon: Request =
+                Request.Builder().url("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/icon.png")
+                    .build()
+
+            val properties = Properties()
+            properties.load(StringReader(response.body.string()))
+
+            val author = when (properties.contains("author")) {
+                true -> properties.getProperty("author").toString()
+                false -> github.commit.author.name
+            }
+
+            val version = properties.getProperty("version")
+            val internalName = properties.getProperty("displayName").lowercase().replace(" ", "_")
+            val support = properties.getProperty("support")
+            val description = properties.getProperty("description")
+            val tags = properties.getProperty("tags").split(",")
+
+
+            return ManifestEntry(
+                hasIcon = client.newCall(requestIcon).execute().code == 200, internalName = internalName,
+                tags = tags, commit = github.sha,
+                support = support, author = author,
+                description = description, link = "https://github.com/${repo}", version = version
+            )
         }
 
-        val version = properties.getProperty("version")
-        val internalName = properties.getProperty("displayName").lowercase().replace(" ","_")
-        val support = properties.getProperty("support")
-        val description = properties.getProperty("description")
-        val tags = properties.getProperty("tags").split(",")
-
-        val entry = ManifestEntry(
-            hasIcon = hasIcon, internalName = internalName,
-            tags = tags, commit = github.sha,
-            support = support, author = author,
-            description = description, link = propsFileLink.substringBefore("/raw"), version = version
-        )
-
-        return entry
+        return null
     }
 
     private fun processWebhook() {
