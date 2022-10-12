@@ -1,12 +1,12 @@
 [{
   "author": "Mark7625",
-  "commit": "29d66940129718ae2c5f3a9212da1a80a06d956c",
-  "description": "Make Runescape Look like Minecraft",
+  "commit": "22a1ba0affbd162124e6cd12285bccb069ecd939",
+  "description": "Make Runescape Look like Runescape 2009",
   "hasIcon": true,
-  "internalName": "runescape_3",
+  "internalName": "runescape_2009",
   "link": "https://github.com/Mark7625/resource-packs",
   "support": "https://github.com/Mark7625/resource-packs/issues",
-  "tags": ["Textures", "Runecape", "RS3"]
+  "tags": ["Textures", "Runecape", "2009"]
 }, {
   "author": "Mark7625",
   "commit": "fa334e374294368142054613757703c8c4126523",
@@ -16,4 +16,13 @@
   "link": "https://github.com/Mark7625/resource-packs",
   "support": "https://github.com/Mark7625/resource-packs/issues",
   "tags": ["Textures", "Minecraft"]
+}, {
+  "author": "Mark7625",
+  "commit": "29d66940129718ae2c5f3a9212da1a80a06d956c",
+  "description": "Make Runescape Look like Minecraft",
+  "hasIcon": true,
+  "internalName": "runescape_3",
+  "link": "https://github.com/Mark7625/resource-packs",
+  "support": "https://github.com/Mark7625/resource-packs/issues",
+  "tags": ["Textures", "Runecape", "RS3"]
 }]
