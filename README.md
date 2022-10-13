@@ -1,34 +1,44 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+![](https://avatars.githubusercontent.com/u/108533386?s=200&v=4)
+# resource-packs
 
-## Getting Started
+This repository contains the packs for 117HD these packs are not officially supported by the 177HD Team.
 
-First, run the development server:
+## Creating new plugins
+There are two methods to create an external plugin, you can either:
 
-```bash
-npm run dev
-# or
-yarn dev
-```
+- Use [this](https://github.com/Mark7625/resource-packs/generate) pack template.
+- Make a new Public repo and add your files to the dir and push the project.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Development
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+[How to design a pack](https://github.com/117HD/RLHD/wiki/v1.1.2-Update-Changelog#environments)
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## Submitting a plugin
+1. Fork the [resource-packs repository](https://github.com/117HD/resource-packs).
+2. Create a new branch for your plugin.
+3. Create a new file in the `packs` directory with the fields:
+ ```
+repository=
+commit=
+ ```
+4. To get the repository url, copy the url from the address bar. Paste the url in in the `repository=` field.
 
-## Learn More
+5. To get the commit hash, go to your plugin repository on GitHub and click on commits. Choose the latest one and copy the full 40-character hash. It can be seen in the top right after selecting a commit. Paste this into the `commit=` field of the file.
+   Your file should now look something like this:
+ ```
+repository=https://github.com/Mark7625/resource-packs/
+commit=9db374fc205c5aae1f99bd5fd127266076f40ec8
+ ```
+6. This is the only change you need to make, so commit your changes and push them to your fork. Then go back to the [resource-packs repository](https://github.com/117HD/resource-packs) and click *New pull request* in the upper left. Choose *Compare across forks* and select your fork and branch as head and compare.
 
-To learn more about Next.js, take a look at the following resources:
+7. Write a short description of what your plugin does and then create your pull request.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+8. Be patient and wait for your plugin to be reviewed and merged.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## Updating a plugin
+To update a plugin, simply update the manifest with the most recent commit hash.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## Plugin resources
+Resources may be included with plugins, which are non-code and are bundled and distributed with the plugin, such as images and sounds. You may do this by placing them in `src/main/resources`. Plugins on the pluginhub are distributed in .jar form and the jars placed into the classpath. The plugin is not unpacked on disk, and you can not assume that it is. This means that using https://docs.oracle.com/javase/8/docs/api/java/lang/Class.html#getResource-java.lang.String- will return a jar-URL when the plugin is deployed to the pluginhub, but in your IDE will be a file-URL. This almost certainly makes it behave differently from how you expect it to, and isn't what you want.
+Instead, prefer using https://docs.oracle.com/javase/8/docs/api/java/lang/Class.html#getResourceAsStream-java.lang.String-.
