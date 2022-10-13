@@ -3,7 +3,7 @@
 
 This repository contains the packs for 117HD these packs are not officially supported by the 177HD Team.
 
-## Creating new plugins
+## Creating new Resource Pack
 There are two methods to create an external plugin, you can either:
 
 - Use [this](https://github.com/Mark7625/resource-packs/generate) pack template.
@@ -14,7 +14,7 @@ There are two methods to create an external plugin, you can either:
 [How to design a pack](https://github.com/117HD/RLHD/wiki/v1.1.2-Update-Changelog#environments)
 
 
-## Submitting a plugin
+## Submitting a resource pack
 1. Fork the [resource-packs repository](https://github.com/117HD/resource-packs).
 2. Create a new branch for your plugin.
 3. Create a new file in the `packs` directory with the fields:
