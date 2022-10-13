@@ -17,4 +17,4 @@ jobs:
         run: chmod +x gradlew
       - name: 🗃️ Updating Manifest
         id: gradle
-        run: ./gradlew update-manifest -Ptoken=${{ secrets.ACCESS_TOKEN }} -Pdiscord=${{ secrets.DISCORD_WEBHOOK }} -stacktrace
+        run: ./gradlew update-manifest -Ptoken=${{ secrets.ACCESS_TOKEN }} -Pdiscord=${{ secrets.DISCORD_WEBHOOK }} -Pcommit=${{ github.sha }} -stacktrace
