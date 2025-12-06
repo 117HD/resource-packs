@@ -38,6 +38,7 @@ data class ManifestEntry(
     @Json(serializeNull = false) val support: String? = null,
     @Json(serializeNull = false) val author: String? = null,
     @Json(serializeNull = false) val description: String? = null,
+    val packType: String,
     val link: String,
     @Json(serializeNull = false) val version: String? = null
 )
@@ -228,12 +229,14 @@ open class ManifestTask : DefaultTask() {
             val version = properties.getProperty("version")
             val support = properties.getProperty("support")
             val description = properties.getProperty("description")
+            val packType = properties.getProperty("packType","RESOURCE")
             val tags = properties.getProperty("tags").split(",")
 
             return Pair(" ",ManifestEntry(
                 hasIcon = foundIcon, internalName = internalName,
                 tags = tags, commit = github.sha,
                 support = support, author = author,
+                packType = packType,
                 description = description, link = "https://github.com/${repo}", version = version
             ))
         }
