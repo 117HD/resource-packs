@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.internal.lowercase
@@ -32,6 +34,7 @@ import kotlin.system.measureTimeMillis
 
 data class ManifestEntry(
     val hasIcon: Boolean,
+    val hasCompactIcon: Boolean,
     val internalName: String,
     @Json(serializeNull = false) val tags: List<String>? = null,
     val commit: String,
@@ -40,6 +43,7 @@ data class ManifestEntry(
     @Json(serializeNull = false) val description: String? = null,
     val packType: String,
     val link: String,
+    val fileSize: Long? = null,
     @Json(serializeNull = false) val version: String? = null
 )
 
@@ -198,6 +202,7 @@ open class ManifestTask : DefaultTask() {
         if (response.code == 200) {
 
             val foundIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/icon.png")
+            val foundCompactIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/compact-icon.png")
 
             if(!foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/licenses.txt")) {
                 return Pair("licenses.txt has not been found this is required",null)
@@ -232,22 +237,70 @@ open class ManifestTask : DefaultTask() {
             val packType = properties.getProperty("packType","RESOURCE")
             val tags = properties.getProperty("tags").split(",")
 
-            return Pair(" ",ManifestEntry(
-                hasIcon = foundIcon, internalName = internalName,
-                tags = tags, commit = github.sha,
-                support = support, author = author,
-                packType = packType,
-                description = description, link = "https://github.com/${repo}", version = version
-            ))
+            return Pair(
+                " ", ManifestEntry(
+                    hasIcon = foundIcon,
+                    internalName = internalName,
+                    tags = tags,
+                    commit = github.sha,
+                    support = support,
+                    author = author,
+                    packType = packType,
+                    fileSize = downloadZipAndGetSize(repo,github.sha),
+                    description = description,
+                    link = "https://github.com/${repo}",
+                    hasCompactIcon = foundCompactIcon,
+                    version = version
+                )
+            )
         }
         return Pair("",null)
 
 
     }
 
-    private fun foundFile(link : String) : Boolean {
-        val requestIcon = Request.Builder().url(link).build()
-        return client.newCall(requestIcon).execute().code == 200
+    private fun downloadZipAndGetSize(repo: String, sha : String): Long? {
+        val zipUrl = "https://github.com".toHttpUrlOrNull()!!
+            .newBuilder()
+            .apply {
+                val parts = repo.split("/")
+                addPathSegment(parts[0])
+                addPathSegment(parts[1])
+            }
+            .addPathSegment("archive")
+            .addPathSegment("${sha}.zip")
+            .build()
+            .toString()
+
+
+
+        val request = Request.Builder().url(zipUrl).get().build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+
+            val body = response.body
+
+            val temp = File.createTempFile("pack-", ".zip")
+
+            body.byteStream().use { input ->
+                temp.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            val size = temp.length()
+            temp.delete()
+
+            return size
+        }
+    }
+
+    private fun foundFile(link: String): Boolean {
+        val request = Request.Builder().url(link).build()
+        client.newCall(request).execute().use { response ->
+            return response.code == 200
+        }
     }
 
     fun Any.jsonToString(prettyPrint: Boolean): String{
