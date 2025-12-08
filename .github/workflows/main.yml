@@ -1,20 +1,347 @@
 name: 🚧 Manifest Updater
 on:
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'packs/**'
   push:
     branches: [main]
+    paths:
+      - 'packs/**'
 
 jobs:
-  gradle:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      pack-files: ${{ steps.detect.outputs.pack-files }}
+      has-changes: ${{ steps.detect.outputs.has-changes }}
+      is-pr: ${{ steps.detect.outputs.is-pr }}
+    steps:
+      - name: 📂 Checkout project sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🔍 Detect changed pack files
+        id: detect
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "is-pr=true" >> $GITHUB_OUTPUT
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "is-pr=false" >> $GITHUB_OUTPUT
+            # For workflow_dispatch, check all pack files
+            BASE_SHA="HEAD~1"
+            HEAD_SHA="HEAD"
+          else
+            echo "is-pr=false" >> $GITHUB_OUTPUT
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+          
+          # Get changed pack files
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACDMRT $BASE_SHA $HEAD_SHA 2>/dev/null | grep "^packs/" || true)
+          
+          # For workflow_dispatch, if no changes detected, check all pack files
+          if [ -z "$CHANGED_FILES" ] && [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            CHANGED_FILES=$(find packs/ -type f 2>/dev/null | grep -v "^$" || true)
+          fi
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "pack-files=" >> $GITHUB_OUTPUT
+            echo "No pack files changed"
+            exit 0
+          fi
+          
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+          echo "pack-files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "Changed pack files:"
+          echo "$CHANGED_FILES"
+
+  process-packs:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 📂 Checkout project sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: 📂 Setup Gradle
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/gradle-build-action@v3
+      
       - name: 🗃️ Adding Permissions
-        id: gradleperm
         run: chmod +x gradlew
-      - name: 🗃️ Updating Manifest
-        id: gradle
-        run: ./gradlew update-manifest -Ptoken=${{ secrets.ACCESS_TOKEN }} -Pdiscord=${{ secrets.DISCORD_WEBHOOK }} -Pcommit=${{ github.sha }} -stacktrace
+      
+      - name: 📝 Parse pack files and generate PR info
+        id: pr-info
+        if: needs.detect-changes.outputs.is-pr == 'true'
+        run: |
+          PACK_FILES="${{ needs.detect-changes.outputs.pack-files }}"
+          COMMENT_BODY="## 📦 Pack File Changes\n\n"
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          
+          # Process each changed pack file
+          while IFS= read -r pack_file; do
+            if [ -z "$pack_file" ]; then
+              continue
+            fi
+            
+            # Determine change type
+            CHANGE_TYPE="Changed"
+            LABEL_TYPE="Changed"
+            if git diff --diff-filter=A $BASE_SHA $HEAD_SHA -- "$pack_file" | grep -q .; then
+              CHANGE_TYPE="Added"
+              LABEL_TYPE="Added"
+            elif git diff --diff-filter=D $BASE_SHA $HEAD_SHA -- "$pack_file" | grep -q .; then
+              CHANGE_TYPE="Removed"
+              LABEL_TYPE="Removed"
+            fi
+            
+            # Store label
+            echo "${LABEL_TYPE}" >> labels.txt
+            
+            # Read pack file properties (only if file exists)
+            if [ -f "$pack_file" ] && [ "$CHANGE_TYPE" != "Removed" ]; then
+              REPO=$(grep "^repository=" "$pack_file" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")
+              COMMIT=$(grep "^commit=" "$pack_file" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")
+              
+              COMMENT_BODY="${COMMENT_BODY}### 📄 ${pack_file}\n"
+              COMMENT_BODY="${COMMENT_BODY}- **Status**: ${CHANGE_TYPE}\n"
+              
+              if [ -n "$REPO" ] && [ -n "$COMMIT" ]; then
+                # Extract repo path from URL
+                REPO_PATH=$(echo "$REPO" | sed 's|https://github.com/||' | sed 's|/$||')
+                
+                # Generate diff link
+                DIFF_LINK="https://github.com/${REPO_PATH}/commit/${COMMIT}"
+                COMMENT_BODY="${COMMENT_BODY}- **Diff Link**: [View Commit](${DIFF_LINK})\n"
+                
+                # Get number of files changed in the diff
+                SIZE_INFO=""
+                if [ -n "$COMMIT" ] && [ -n "$REPO_PATH" ]; then
+                  # Get the parent commit to compare against
+                  COMMIT_DATA=$(curl -s "https://api.github.com/repos/${REPO_PATH}/commits/${COMMIT}" 2>/dev/null || echo "")
+                  if [ -n "$COMMIT_DATA" ]; then
+                    PARENT_SHA=$(echo "$COMMIT_DATA" | grep -o '"sha":"[^"]*"' | head -2 | tail -1 | cut -d'"' -f4 || echo "")
+                    if [ -n "$PARENT_SHA" ]; then
+                      # Get the diff stats to count files changed
+                      DIFF_STATS=$(curl -s "https://api.github.com/repos/${REPO_PATH}/compare/${PARENT_SHA}...${COMMIT}" 2>/dev/null || echo "")
+                      if [ -n "$DIFF_STATS" ]; then
+                        # Count files in the files array - look for "filename" occurrences or use files array length
+                        FILES_CHANGED=$(echo "$DIFF_STATS" | grep -o '"filename"' | wc -l | tr -d ' ' || echo "")
+                        # Alternative: try to get from total_count if available
+                        if [ -z "$FILES_CHANGED" ] || [ "$FILES_CHANGED" == "0" ]; then
+                          FILES_CHANGED=$(echo "$DIFF_STATS" | grep -o '"total_count":[0-9]*' | grep -o '[0-9]*' | head -1 || echo "")
+                        fi
+                        if [ -n "$FILES_CHANGED" ] && [ "$FILES_CHANGED" != "0" ]; then
+                          SIZE_INFO="Files Changed: ${FILES_CHANGED}"
+                          echo "Size" >> labels.txt
+                        fi
+                      fi
+                    fi
+                  fi
+                fi
+                
+                # Get author info (only for Changed status, and only if author changed)
+                AUTHOR_INFO=""
+                if [ "$CHANGE_TYPE" == "Changed" ] && [ -n "$COMMIT" ] && [ -n "$REPO_PATH" ]; then
+                  # Get current commit author
+                  COMMIT_DATA=$(curl -s "https://api.github.com/repos/${REPO_PATH}/commits/${COMMIT}" 2>/dev/null || echo "")
+                  if [ -n "$COMMIT_DATA" ]; then
+                    CURRENT_AUTHOR=$(echo "$COMMIT_DATA" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+                    
+                    # Get previous commit from pack file in base branch to compare
+                    OLD_COMMIT=$(git show "$BASE_SHA:$pack_file" 2>/dev/null | grep "^commit=" | cut -d'=' -f2- | tr -d '\r\n' || echo "")
+                    if [ -n "$OLD_COMMIT" ] && [ "$OLD_COMMIT" != "$COMMIT" ] && [ -n "$CURRENT_AUTHOR" ]; then
+                      OLD_COMMIT_DATA=$(curl -s "https://api.github.com/repos/${REPO_PATH}/commits/${OLD_COMMIT}" 2>/dev/null || echo "")
+                      if [ -n "$OLD_COMMIT_DATA" ]; then
+                        OLD_AUTHOR=$(echo "$OLD_COMMIT_DATA" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+                        # Only show author info if it actually changed
+                        if [ -n "$OLD_AUTHOR" ] && [ "$CURRENT_AUTHOR" != "$OLD_AUTHOR" ]; then
+                          AUTHOR_INFO="Author Changed: ${CURRENT_AUTHOR} (was ${OLD_AUTHOR})"
+                          echo "Author" >> labels.txt
+                        fi
+                      fi
+                    fi
+                  fi
+                fi
+                
+                if [ -n "$SIZE_INFO" ]; then
+                  COMMENT_BODY="${COMMENT_BODY}- ${SIZE_INFO}\n"
+                fi
+                if [ -n "$AUTHOR_INFO" ]; then
+                  COMMENT_BODY="${COMMENT_BODY}- ${AUTHOR_INFO}\n"
+                fi
+              fi
+              COMMENT_BODY="${COMMENT_BODY}\n"
+            elif [ "$CHANGE_TYPE" == "Removed" ]; then
+              COMMENT_BODY="${COMMENT_BODY}### 📄 ${pack_file}\n"
+              COMMENT_BODY="${COMMENT_BODY}- **Status**: ${CHANGE_TYPE}\n\n"
+            fi
+          done <<< "$PACK_FILES"
+          
+          # Store comment body
+          echo "comment-body<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$COMMENT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Store unique labels
+          if [ -f labels.txt ]; then
+            UNIQUE_LABELS=$(sort -u labels.txt | tr '\n' ',' | sed 's/,$//')
+            echo "labels=$UNIQUE_LABELS" >> $GITHUB_OUTPUT
+          else
+            echo "labels=" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: 💬 Create or update PR comment
+        if: needs.detect-changes.outputs.is-pr == 'true' && steps.pr-info.outputs.comment-body != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentBody = `${{ steps.pr-info.outputs.comment-body }}`;
+            
+            if (!commentBody || commentBody.trim() === '') {
+              console.log('No comment body to post');
+              return;
+            }
+            
+            // Find existing comment from this workflow
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('## 📦 Pack File Changes')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
+      
+      - name: 🏷️ Add labels to PR
+        if: needs.detect-changes.outputs.is-pr == 'true' && steps.pr-info.outputs.labels != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const labelsStr = '${{ steps.pr-info.outputs.labels }}';
+            const labels = labelsStr ? labelsStr.split(',').filter(l => l && l.trim()) : [];
+            
+            if (labels.length > 0) {
+              // Ensure labels exist, create if they don't
+              for (const label of labels) {
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.trim()
+                  });
+                } catch (error) {
+                  // Label doesn't exist, create it
+                  const colors = {
+                    'Added': '28a745',
+                    'Removed': 'd73a4a',
+                    'Changed': '0075ca',
+                    'Size': 'fbca04',
+                    'Author': '0e8a16'
+                  };
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.trim(),
+                    color: colors[label.trim()] || 'fbca04'
+                  });
+                }
+              }
+              
+              // Add labels to PR
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: labels.map(l => l.trim())
+              });
+            }
+      
+      - name: 🗃️ Run ManifestTask
+        id: manifest-task
+        run: |
+          PACK_FILES="${{ needs.detect-changes.outputs.pack-files }}"
+          
+          # Convert pack files list to comma-separated format for Gradle
+          PACK_FILES_LIST=$(echo "$PACK_FILES" | tr '\n' ',' | sed 's/,$//')
+          
+          echo "Running ManifestTask with pack files: $PACK_FILES_LIST"
+          
+          # Run ManifestTask with pack files list
+          set +e
+          OUTPUT=$(./gradlew update-manifest \
+            -Ptoken=${{ secrets.ACCESS_TOKEN }} \
+            -Pdiscord=${{ secrets.DISCORD_WEBHOOK }} \
+            -Pcommit=${{ github.sha }} \
+            -PpackFiles="$PACK_FILES_LIST" \
+            --stacktrace 2>&1)
+          EXIT_CODE=$?
+          set -e
+          
+          echo "$OUTPUT"
+          
+          # Check exit code and output for errors
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "message<<EOF" >> $GITHUB_OUTPUT
+            echo "$OUTPUT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          elif echo "$OUTPUT" | grep -qiE "error|failed|unable|exception"; then
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "message<<EOF" >> $GITHUB_OUTPUT
+            echo "$OUTPUT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=Manifest updated successfully" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: ✅ Report success
+        if: steps.manifest-task.outputs.status == 'success'
+        run: |
+          echo "✅ ManifestTask completed successfully"
+          echo "${{ steps.manifest-task.outputs.message }}"
+      
+      - name: ❌ Report failure
+        if: steps.manifest-task.outputs.status == 'error'
+        run: |
+          echo "❌ ManifestTask failed"
+          echo "${{ steps.manifest-task.outputs.message }}"
+          exit 1
