@@ -16,5 +16,21 @@
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
     "fileSize": 316991,
     "hasSettings": false
+  },
+  {
+    "hasIcon": true,
+    "hasCompactIcon": true,
+    "internalName": "vanilla+",
+    "tags": [
+      "Vanilla"
+    ],
+    "commit": "11957733fc62255c11d537f8d26c3dff4bd5aa4b",
+    "support": "https://github.com/Mark7625/resource-packs/issues",
+    "author": "117 HD",
+    "description": "Make 117 Look like Vanilla",
+    "packType": "RESOURCE",
+    "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
+    "fileSize": 203071,
+    "hasSettings": true
   }
 ]
