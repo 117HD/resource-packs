@@ -1,3 +1,20 @@
 [
- 
+  {
+    "hasIcon": true,
+    "hasCompactIcon": true,
+    "internalName": "legacy_theatre_of_blood",
+    "tags": [
+      "Theatre of Blood",
+      "Legacy",
+      "117 HD"
+    ],
+    "commit": "f548f9347f9eb3e7af9ff9be9f4184455cc69517",
+    "support": "https://github.com/Mark7625/resource-packs/issues",
+    "author": "117 HD",
+    "description": "Previously, Theatre of Blood used to look a whole lot more blue. This option brings back that same old look.",
+    "packType": "ADDON",
+    "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
+    "fileSize": 316991,
+    "hasSettings": false
+  }
 ]
