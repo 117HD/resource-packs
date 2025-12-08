@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -234,11 +233,6 @@ open class ManifestTask : DefaultTask() {
             }
 
 
-            if(foundSettings && author != "117 HD") {
-                return Pair("Settings ain't available your user",null)
-            }
-
-
             val version = properties.getProperty("version")
             val support = properties.getProperty("support")
             val description = properties.getProperty("description")
@@ -326,6 +320,7 @@ open class ManifestTask : DefaultTask() {
     }
 
     fun updateRepo() {
+
         val gh = GitHub.connectUsingOAuth(project.property("token").toString())
         val repo = gh.getOrganization("117HD").getRepository("resource-packs")
 
