@@ -203,7 +203,7 @@ open class ManifestTask : DefaultTask() {
         if (response.code == 200) {
 
             val foundIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/icon.png")
-            val foundSettings = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/pack.properties")
+            val foundSettings = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/settings.properties")
             val foundCompactIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/compact-icon.png")
 
             if(!foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/licenses.txt")) {
