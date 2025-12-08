@@ -44,6 +44,7 @@ data class ManifestEntry(
     val packType: String,
     val link: String,
     val fileSize: Long? = null,
+    val hasSettings: Boolean = false,
     @Json(serializeNull = false) val version: String? = null
 )
 
@@ -202,6 +203,7 @@ open class ManifestTask : DefaultTask() {
         if (response.code == 200) {
 
             val foundIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/icon.png")
+            val foundSettings = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/pack.properties")
             val foundCompactIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/compact-icon.png")
 
             if(!foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/licenses.txt")) {
@@ -231,6 +233,12 @@ open class ManifestTask : DefaultTask() {
                 false -> github.commit.author.name
             }
 
+
+            if(foundSettings && author != "117 HD") {
+                return Pair("Settings ain't available your user",null)
+            }
+
+
             val version = properties.getProperty("version")
             val support = properties.getProperty("support")
             val description = properties.getProperty("description")
@@ -250,6 +258,7 @@ open class ManifestTask : DefaultTask() {
                     description = description,
                     link = "https://github.com/${repo}",
                     hasCompactIcon = foundCompactIcon,
+                    hasSettings = foundSettings,
                     version = version
                 )
             )
