@@ -1,0 +1,2 @@
+repository=https://github.com/Mark7625/rlhd-custom-resource-packs
+commit=a2de39c97f675ca88bda105332afb8d16059a5f8
