@@ -32,5 +32,24 @@
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
     "fileSize": 203071,
     "hasSettings": true
+  },
+  {
+    "hasIcon": true,
+    "hasCompactIcon": true,
+    "internalName": "tzhaar_reskin",
+    "tags": [
+      "TzHaar",
+      "Legacy",
+      "Skin",
+      "117 HD"
+    ],
+    "commit": "a2de39c97f675ca88bda105332afb8d16059a5f8",
+    "support": "https://github.com/Mark7625/resource-packs/issues",
+    "author": "117 HD",
+    "description": "Reskins the TzHaar environment to match the orange graphics that were introduced with the HD update in RS3. ",
+    "packType": "ADDON",
+    "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
+    "fileSize": 240578,
+    "hasSettings": false
   }
 ]
