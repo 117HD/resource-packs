@@ -74,12 +74,16 @@ open class PRCommentTask : DefaultTask() {
 
         val packService = PackService(client)
 
-        val headPackInfo = packService.readPackFile(actualRepo, packFilePath, pr.head.sha)
+        val headPackInfo = if (status == Labels.REMOVED) {
+            packService.readPackFile(actualRepo, packFilePath, pr.base.ref)
+        } else {
+            packService.readPackFile(actualRepo, packFilePath, pr.head.sha)
+        }
         
         val commentService = PRCommentService()
         validateCommit(headPackInfo, packFilePath, pr, client, commentService)
 
-        val mainPackInfo = if (status == Labels.CHANGED) {
+        val mainPackInfo = if (status == Labels.CHANGED || status == Labels.REMOVED) {
             packService.readPackFile(actualRepo, packFilePath, pr.base.ref)
         } else null
 
@@ -115,6 +119,7 @@ open class PRCommentTask : DefaultTask() {
         commentService.addPackChangesComment(
             pr, packFilePath, status, headPackInfo, mainPackInfo, filesChanged, validationErrors
         )
+        require(validationErrors.isEmpty()) { "Pack validation failed: ${validationErrors.joinToString("; ")}" }
 
         logSummary(prNumber, prFile.filename, status, headPackInfo, size, authorChanged)
     }
@@ -137,6 +142,7 @@ open class PRCommentTask : DefaultTask() {
 
     fun validatePackFilePath(filePath: String): String {
         require(filePath.startsWith("packs/")) { "File must be in packs/ directory: $filePath" }
+        require(!filePath.removePrefix("packs/").contains('/')) { "Pack descriptor must be directly inside packs/: $filePath" }
         return filePath
     }
 

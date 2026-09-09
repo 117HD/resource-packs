@@ -46,6 +46,7 @@ class AuthorValidationService(
                 pr, packFilePath,
                 "Author changed from '${mainPackProps?.author}' to '$authorForValidation', but PR author '$prAuthor' does not match the new author(s). Please ensure the PR is created by one of the listed authors: ${authors.joinToString(", ")}."
             )
+            throw IllegalStateException("Author validation failed: PR author does not match")
         }
 
         return true
@@ -77,4 +78,3 @@ class AuthorValidationService(
         return true
     }
 }
-

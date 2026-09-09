@@ -26,11 +26,9 @@ class FileValidationService(private val client: OkHttpClient) {
             add("description is required in pack.properties")
         }
 
-        // Check for unique internalName only for new packs
-        if (status == Labels.ADDED && packProps.internalName != null) {
-            if (packProps.internalName in existingInternalNames) {
-                add("${packProps.internalName} is already in use please use a new name")
-            }
+        // The descriptor owns the stable identifier; a display name may change freely.
+        if (status == Labels.ADDED && packInfo.internalName in existingInternalNames) {
+            add("${packInfo.internalName} is already in use; choose a new internalName")
         }
 
         val baseUrl = "${BASE_GUTHUB_LINK_RAW}${packInfo.repoLink}/${packInfo.commit}"
@@ -91,4 +89,3 @@ class FileValidationService(private val client: OkHttpClient) {
             null
         }
 }
-

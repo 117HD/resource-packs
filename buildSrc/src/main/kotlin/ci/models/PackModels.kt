@@ -1,7 +1,7 @@
 package ci.models
 
-@OptIn(ExperimentalStdlibApi::class)
 data class PackFileInfo(
+    val internalName: String,
     val repository: String,
     val commit: String
 ) {
@@ -14,8 +14,4 @@ data class PackProperties(
     val author: String?,
     val description: String?,
     val displayName: String?
-) {
-    @OptIn(ExperimentalStdlibApi::class)
-    val internalName: String? = displayName?.lowercase()?.replace(" ", "_")
-}
-
+)
