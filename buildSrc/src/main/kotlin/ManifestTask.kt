@@ -162,10 +162,13 @@ open class ManifestTask : DefaultTask()
         require(packProperties == 1) { "$internalName: archive must contain exactly one pack.properties" }
     }
 
-    private fun isSafeArchivePath(path: String): Boolean = path.isNotEmpty()
-        && !path.startsWith('/')
-        && !path.contains('\\')
-        && path.split('/').none { it.isEmpty() || it == "." || it == ".." }
+    private fun isSafeArchivePath(path: String): Boolean {
+        val normalized = path.removeSuffix("/")
+        return normalized.isNotEmpty()
+            && !normalized.startsWith('/')
+            && !normalized.contains('\\')
+            && normalized.split('/').none { it.isEmpty() || it == "." || it == ".." }
+    }
 
     private fun parseTags(rawTags: String?, internalName: String): List<String> {
         val tags = rawTags?.split(',')?.map(String::trim)?.filter(String::isNotEmpty) ?: emptyList()
