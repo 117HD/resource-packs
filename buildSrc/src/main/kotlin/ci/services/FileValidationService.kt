@@ -84,7 +84,7 @@ class FileValidationService(private val client: OkHttpClient) {
             }
         }.getOrElse {
             System.err.println("Failed to validate $fileName size: ${it.message}")
-            null
+            "$fileName could not be validated: ${it.message ?: "unknown error"}"
         }
 
     private fun readLimited(input: java.io.InputStream, limit: Int): ByteArray {

@@ -4,6 +4,7 @@ import Constants.BASE_GUTHUB_LINK_RAW
 import ci.config.Constants
 import ci.config.PRConfig
 import ci.models.PackFileInfo
+import ci.models.PackValidation
 import ci.services.*
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Internal
@@ -105,7 +106,10 @@ open class PRCommentTask : DefaultTask() {
 
     fun validatePackFilePath(filePath: String): String {
         require(filePath.startsWith("packs/")) { "File must be in packs/ directory: $filePath" }
-        require(!filePath.removePrefix("packs/").contains('/')) { "Pack descriptor must be directly inside packs/: $filePath" }
+        val filename = filePath.removePrefix("packs/")
+        require(!filename.contains('/') && PackValidation.isSafeDescriptorFilename(filename)) {
+            "Pack descriptor must be directly inside packs/ and use only lowercase letters, numbers, _ and -: $filePath"
+        }
         return filePath
     }
 

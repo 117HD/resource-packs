@@ -70,6 +70,7 @@ open class ManifestTask : DefaultTask()
     private fun readSource(file: java.io.File): PackSource
     {
         val properties = Properties().apply { file.inputStream().use(::load) }
+        require(PackValidation.isSafeDescriptorFilename(file.name)) { "${file.name}: descriptor filenames may contain only lowercase letters, numbers, _ and -" }
         val descriptor = PackValidation.readDescriptor(properties, file.name)
         val repositoryParts = descriptor.repoLink.split('/')
         return PackSource(descriptor.internalName, repositoryParts[0], repositoryParts[1], descriptor.commit.toLowerCase(Locale.ROOT))

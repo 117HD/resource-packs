@@ -26,4 +26,6 @@ object PackValidation {
     }
 
     fun allowsSettings(internalName: String): Boolean = internalName in settingsAllowedPacks
+
+    fun isSafeDescriptorFilename(filename: String): Boolean = internalNamePattern.matches(filename)
 }
