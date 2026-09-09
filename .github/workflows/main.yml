@@ -43,6 +43,7 @@ jobs:
       - name: Validate merged pack manifest
         run: |
           git fetch --no-tags origin +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/resource-pack-pr
+          test "$(git rev-parse refs/remotes/origin/resource-pack-pr)" = "${{ github.event.pull_request.head.sha }}"
           git checkout refs/remotes/origin/resource-pack-pr -- packs
           ./gradlew validate-manifest
   

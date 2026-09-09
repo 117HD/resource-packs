@@ -10,6 +10,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.kohsuke.github.GitHub
 import java.io.ByteArrayOutputStream
+import java.io.FilterInputStream
 import java.io.StringReader
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -20,6 +21,7 @@ import java.util.Locale
 import java.util.Properties
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipInputStream
 
 data class ManifestEntry(
     val hasIcon: Boolean,
@@ -50,6 +52,9 @@ open class ManifestTask : DefaultTask()
     {
         private const val MANIFEST_BRANCH = "manifest"
         private const val MAX_ARCHIVE_SIZE = 512L * 1024 * 1024
+        private const val MAX_ARCHIVE_ENTRIES = 10_000
+        private const val MAX_ARCHIVE_ENTRY_SIZE = 128L * 1024 * 1024
+        private const val MAX_ARCHIVE_UNCOMPRESSED_SIZE = 1024L * 1024 * 1024
         private const val MAX_API_RESPONSE_SIZE = 1024 * 1024
         private const val MAX_PROPERTIES_SIZE = 64 * 1024
     }
@@ -71,6 +76,7 @@ open class ManifestTask : DefaultTask()
         require(packFiles.isNotEmpty()) { "No official pack descriptors were found" }
         val entries = packFiles.map { generateEntry(readSource(it)) }.sortedBy { it.internalName }
         require(entries.map { it.internalName }.distinct().size == entries.size) { "Pack internal names must be unique" }
+        require(entries.map { it.sha256 }.distinct().size == entries.size) { "Official packs must not share an archive SHA-256" }
         if (publish)
             updateRepo(entries)
         println("${if (publish) "Published" else "Validated"} ${entries.size} resource pack entries")
@@ -104,7 +110,7 @@ open class ManifestTask : DefaultTask()
             hasCompactIcon = exists(rawUrl(source, "compact-icon.png")),
             displayName = displayName,
             internalName = source.internalName,
-            tags = properties.getProperty("tags")?.split(',')?.map(String::trim)?.filter(String::isNotEmpty) ?: emptyList(),
+            tags = parseTags(properties.getProperty("tags"), source.internalName),
             commit = resolvedCommit.toLowerCase(Locale.ROOT),
             support = properties.getProperty("support")?.trim()?.takeIf(String::isNotEmpty),
             author = packProperties.author,
@@ -123,19 +129,72 @@ open class ManifestTask : DefaultTask()
         return client.newCall(request).execute().use { response ->
             require(response.isSuccessful) { "${source.internalName}: archive download failed (HTTP ${response.code})" }
             val digest = MessageDigest.getInstance("SHA-256")
-            var size = 0L
-            response.body.byteStream().use { input ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true)
-                {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    size += read
-                    require(size <= MAX_ARCHIVE_SIZE) { "${source.internalName}: archive exceeds ${MAX_ARCHIVE_SIZE / 1024 / 1024} MiB" }
-                    digest.update(buffer, 0, read)
-                }
+            val input = ValidatingArchiveInputStream(response.body.byteStream(), digest, source.internalName)
+            ZipInputStream(input).use { zip -> validateArchive(zip, source.internalName) }
+            ArchiveInfo(input.size, digest.digest().joinToString("") { "%02x".format(it) })
+        }
+    }
+
+    private fun validateArchive(zip: ZipInputStream, internalName: String) {
+        val names = mutableSetOf<String>()
+        var entries = 0
+        var uncompressedSize = 0L
+        var packProperties = 0
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val entry = zip.nextEntry ?: break
+            require(++entries <= MAX_ARCHIVE_ENTRIES) { "$internalName: archive has too many entries" }
+            require(isSafeArchivePath(entry.name)) { "$internalName: archive contains an unsafe entry path" }
+            require(names.add(entry.name)) { "$internalName: archive contains duplicate entries" }
+            if (!entry.isDirectory && (entry.name == "pack.properties" || entry.name.endsWith("/pack.properties")))
+                packProperties++
+            var entrySize = 0L
+            while (true) {
+                val read = zip.read(buffer)
+                if (read < 0) break
+                entrySize += read
+                uncompressedSize += read
+                require(entrySize <= MAX_ARCHIVE_ENTRY_SIZE) { "$internalName: archive entry is too large" }
+                require(uncompressedSize <= MAX_ARCHIVE_UNCOMPRESSED_SIZE) { "$internalName: archive expands beyond the allowed size" }
             }
-            ArchiveInfo(size, digest.digest().joinToString("") { "%02x".format(it) })
+            zip.closeEntry()
+        }
+        require(packProperties == 1) { "$internalName: archive must contain exactly one pack.properties" }
+    }
+
+    private fun isSafeArchivePath(path: String): Boolean = path.isNotEmpty()
+        && !path.startsWith('/')
+        && !path.contains('\\')
+        && path.split('/').none { it.isEmpty() || it == "." || it == ".." }
+
+    private fun parseTags(rawTags: String?, internalName: String): List<String> {
+        val tags = rawTags?.split(',')?.map(String::trim)?.filter(String::isNotEmpty) ?: emptyList()
+        require(tags.size <= 12) { "$internalName: pack has too many tags" }
+        require(tags.all { it.length <= 40 }) { "$internalName: pack tags must be at most 40 characters" }
+        require(tags.distinct().size == tags.size) { "$internalName: pack tags must be unique" }
+        return tags
+    }
+
+    private class ValidatingArchiveInputStream(input: java.io.InputStream, private val digest: MessageDigest, private val internalName: String) : FilterInputStream(input) {
+        var size = 0L
+            private set
+
+        override fun read(): Int {
+            val value = super.read()
+            if (value >= 0) record(byteArrayOf(value.toByte()))
+            return value
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            val read = super.read(buffer, offset, length)
+            if (read > 0) record(buffer, offset, read)
+            return read
+        }
+
+        private fun record(buffer: ByteArray, offset: Int = 0, length: Int = buffer.size) {
+            size += length
+            require(size <= MAX_ARCHIVE_SIZE) { "$internalName: archive exceeds ${MAX_ARCHIVE_SIZE / 1024 / 1024} MiB" }
+            digest.update(buffer, offset, length)
         }
     }
 
