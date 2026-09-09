@@ -41,6 +41,9 @@ private data class ArchiveInfo(val size: Long, val sha256: String)
 
 open class ManifestTask : DefaultTask()
 {
+    @Internal
+    var publish = true
+
     companion object
     {
         private const val MANIFEST_BRANCH = "manifest"
@@ -63,8 +66,9 @@ open class ManifestTask : DefaultTask()
         require(packFiles.isNotEmpty()) { "No official pack descriptors were found" }
         val entries = packFiles.map { generateEntry(readSource(it)) }.sortedBy { it.internalName }
         require(entries.map { it.internalName }.distinct().size == entries.size) { "Pack internal names must be unique" }
-        updateRepo(entries)
-        println("Published ${entries.size} resource pack entries")
+        if (publish)
+            updateRepo(entries)
+        println("${if (publish) "Published" else "Validated"} ${entries.size} resource pack entries")
     }
 
     private fun readSource(file: java.io.File): PackSource

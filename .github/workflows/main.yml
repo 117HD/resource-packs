@@ -39,6 +39,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./gradlew process-pr-comments -PPR_NUMBER=${{ github.event.pull_request.number }} -PREPO_NAME=${{ github.repository }}
+
+      - name: Validate merged pack manifest
+        run: |
+          git fetch --no-tags origin +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/resource-pack-pr
+          git checkout refs/remotes/origin/resource-pack-pr -- packs
+          ./gradlew validate-manifest
   
   update-manifest:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')

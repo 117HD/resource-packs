@@ -7,6 +7,9 @@ class ManifestPlugin : Plugin<Project> {
 
     override fun apply(project: Project): Unit = with(project) {
         tasks.register<ManifestTask>("update-manifest")
+        tasks.register<ManifestTask>("validate-manifest") {
+            publish = false
+        }
         tasks.register<PRCommentTask>("process-pr-comments")
     }
 
