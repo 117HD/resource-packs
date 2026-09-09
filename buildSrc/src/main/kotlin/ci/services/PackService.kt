@@ -6,11 +6,13 @@ import ci.models.PackProperties
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.kohsuke.github.GHRepository
+import java.io.ByteArrayOutputStream
 import java.util.Properties
 
 class PackService(private val client: OkHttpClient) {
 
     companion object {
+        private const val MAX_PROPERTIES_SIZE = 64 * 1024
         private val INTERNAL_NAME = Regex("[a-z0-9_-]+")
         private val COMMIT = Regex("[0-9a-fA-F]{40}")
         private val GITHUB_REPOSITORY = Regex("https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
@@ -46,7 +48,7 @@ class PackService(private val client: OkHttpClient) {
         return client.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
                 val props = Properties().apply {
-                    load(response.body.string().reader())
+                    load(readLimited(response.body.byteStream(), MAX_PROPERTIES_SIZE).reader())
                 }
                 PackProperties(
                     author = props.getProperty("author")?.trim(),
@@ -57,5 +59,19 @@ class PackService(private val client: OkHttpClient) {
                 PackProperties(null, null, null)
             }
         }
+    }
+
+    private fun readLimited(input: java.io.InputStream, limit: Int): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        input.use {
+            while (true) {
+                val read = it.read(buffer)
+                if (read < 0) break
+                require(output.size() + read <= limit) { "pack.properties exceeds $limit bytes" }
+                output.write(buffer, 0, read)
+            }
+        }
+        return output.toString(Charsets.UTF_8.name())
     }
 }

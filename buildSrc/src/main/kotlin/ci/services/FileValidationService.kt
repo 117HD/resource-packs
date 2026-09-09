@@ -7,9 +7,14 @@ import ci.models.PackProperties
 import ci.Labels
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
 class FileValidationService(private val client: OkHttpClient) {
+
+    companion object {
+        private const val MAX_ICON_SIZE = 1024 * 1024
+    }
 
     @OptIn(ExperimentalStdlibApi::class)
     fun validateRequiredFiles(
@@ -69,7 +74,7 @@ class FileValidationService(private val client: OkHttpClient) {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null
 
-                val imageBytes = response.body?.bytes() ?: return@use null
+                val imageBytes = readLimited(response.body.byteStream(), MAX_ICON_SIZE)
                 val image = ImageIO.read(java.io.ByteArrayInputStream(imageBytes))
 
                 if (image == null) {
@@ -88,4 +93,18 @@ class FileValidationService(private val client: OkHttpClient) {
             System.err.println("Failed to validate $fileName size: ${it.message}")
             null
         }
+
+    private fun readLimited(input: java.io.InputStream, limit: Int): ByteArray {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        input.use {
+            while (true) {
+                val read = it.read(buffer)
+                if (read < 0) break
+                require(output.size() + read <= limit) { "Image exceeds $limit bytes" }
+                output.write(buffer, 0, read)
+            }
+        }
+        return output.toByteArray()
+    }
 }
