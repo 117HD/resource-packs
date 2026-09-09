@@ -27,7 +27,7 @@ commit=
 
 4. To get the repository URL, copy the exact repository URL from the address bar. It must be in the form `https://github.com/owner/repository`, without a trailing slash or any additional path.
 
-5. To get the commit hash, go to your pack repository on GitHub and click on commits. Choose the latest one and copy the full 40-character hash. It can be seen in the top right after selecting a commit. Paste this into the `commit=` field of the file.
+5. To get the commit hash, go to your pack repository on GitHub and click on commits. Choose the latest one and copy the complete hash. It must be either a 40-character Git SHA-1 or a 64-character SHA-256. Paste this into the `commit=` field of the file.
    Your file should now look something like this:
  ```
 internalName=my_resource_pack
@@ -42,4 +42,4 @@ commit=9db374fc205c5aae1f99bd5fd127266076f40ec8
 
 ## Updating a pack
 
-To update a pack, change its descriptor's `commit` to the most recent full 40-character Git commit hash. Do not change `internalName` when updating an existing pack.
+To update a pack, change its descriptor's `commit` to the most recent complete Git commit hash (40-character SHA-1 or 64-character SHA-256). Do not change `internalName` when updating an existing pack.

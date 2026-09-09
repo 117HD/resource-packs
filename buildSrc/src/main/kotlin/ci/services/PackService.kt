@@ -14,7 +14,7 @@ class PackService(private val client: OkHttpClient) {
     companion object {
         private const val MAX_PROPERTIES_SIZE = 64 * 1024
         private val INTERNAL_NAME = Regex("[a-z0-9_-]+")
-        private val COMMIT = Regex("[0-9a-fA-F]{40}")
+        private val COMMIT = Regex("(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})")
         private val GITHUB_REPOSITORY = Regex("https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
     }
 
@@ -36,7 +36,7 @@ class PackService(private val client: OkHttpClient) {
         require(GITHUB_REPOSITORY.matches(repository)) {
             "repository in $filePath must be exactly https://github.com/owner/repository"
         }
-        require(COMMIT.matches(commit)) { "commit in $filePath must be a full 40-character SHA-1" }
+        require(COMMIT.matches(commit)) { "commit in $filePath must be a full 40-character SHA-1 or 64-character SHA-256" }
 
         return PackFileInfo(internalName, repository, commit)
     }

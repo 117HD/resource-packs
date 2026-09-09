@@ -46,7 +46,7 @@ open class ManifestTask : DefaultTask()
         private const val MAX_API_RESPONSE_SIZE = 1024 * 1024
         private const val MAX_PROPERTIES_SIZE = 64 * 1024
         private val INTERNAL_NAME = Regex("[a-z0-9_-]+")
-        private val COMMIT = Regex("[0-9a-fA-F]{40}")
+        private val COMMIT = Regex("(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})")
         private val GITHUB_REPOSITORY = Regex("https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
     }
 
@@ -77,7 +77,7 @@ open class ManifestTask : DefaultTask()
         val match = GITHUB_REPOSITORY.matchEntire(repositoryUrl)
             ?: error("${file.name}: repository must be exactly https://github.com/owner/repository")
         val commit = properties.getProperty("commit")?.trim() ?: error("${file.name}: commit is required")
-        require(COMMIT.matches(commit)) { "${file.name}: commit must be a full 40-character SHA-1" }
+        require(COMMIT.matches(commit)) { "${file.name}: commit must be a full 40-character SHA-1 or 64-character SHA-256" }
         return PackSource(internalName, match.groupValues[1], match.groupValues[2], commit.toLowerCase(Locale.ROOT))
     }
 
