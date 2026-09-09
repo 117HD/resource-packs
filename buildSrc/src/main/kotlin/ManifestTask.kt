@@ -11,6 +11,8 @@ import org.gradle.api.tasks.TaskAction
 import org.kohsuke.github.GitHub
 import java.io.ByteArrayOutputStream
 import java.io.StringReader
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,7 +64,10 @@ open class ManifestTask : DefaultTask()
     @TaskAction
     fun generate()
     {
-        val packFiles = project.file("packs").listFiles()?.filter { it.isFile }?.sortedBy { it.name } ?: emptyList()
+        val packFiles = project.file("packs").listFiles()
+            ?.filter { Files.isRegularFile(it.toPath(), LinkOption.NOFOLLOW_LINKS) }
+            ?.sortedBy { it.name }
+            ?: emptyList()
         require(packFiles.isNotEmpty()) { "No official pack descriptors were found" }
         val entries = packFiles.map { generateEntry(readSource(it)) }.sortedBy { it.internalName }
         require(entries.map { it.internalName }.distinct().size == entries.size) { "Pack internal names must be unique" }
