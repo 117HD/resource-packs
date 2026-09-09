@@ -7,6 +7,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.kohsuke.github.GitHub
+import java.io.ByteArrayOutputStream
 import java.io.StringReader
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -42,6 +43,8 @@ open class ManifestTask : DefaultTask()
     {
         private const val MANIFEST_BRANCH = "manifest"
         private const val MAX_ARCHIVE_SIZE = 512L * 1024 * 1024
+        private const val MAX_API_RESPONSE_SIZE = 1024 * 1024
+        private const val MAX_PROPERTIES_SIZE = 64 * 1024
         private val INTERNAL_NAME = Regex("[a-z0-9_-]+")
         private val COMMIT = Regex("[0-9a-fA-F]{40}")
         private val GITHUB_REPOSITORY = Regex("https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
@@ -80,10 +83,10 @@ open class ManifestTask : DefaultTask()
 
     private fun generateEntry(source: PackSource): ManifestEntry
     {
-        val resolvedCommit = Gson().fromJson(getText(apiUrl(source, "commits/${source.commit}")), Map::class.java)["sha"] as? String
+        val resolvedCommit = Gson().fromJson(getText(apiUrl(source, "commits/${source.commit}"), MAX_API_RESPONSE_SIZE), Map::class.java)["sha"] as? String
             ?: error("${source.internalName}: unable to resolve commit ${source.commit}")
         require(resolvedCommit.equals(source.commit, ignoreCase = true)) { "${source.internalName}: GitHub resolved a different commit than requested" }
-        val properties = Properties().apply { load(StringReader(getText(rawUrl(source, "pack.properties")))) }
+        val properties = Properties().apply { load(StringReader(getText(rawUrl(source, "pack.properties"), MAX_PROPERTIES_SIZE))) }
         val displayName = properties.getProperty("displayName")?.trim()
             ?: error("${source.internalName}: pack.properties must declare displayName")
         val archive = downloadArchive(source)
@@ -133,13 +136,30 @@ open class ManifestTask : DefaultTask()
         return client.newCall(request).execute().use { it.isSuccessful }
     }
 
-    private fun getText(url: String): String
+    private fun getText(url: String, limit: Int): String
     {
         val request = Request.Builder().url(url).get().build()
         return client.newCall(request).execute().use { response ->
             require(response.isSuccessful) { "Request failed for $url (HTTP ${response.code})" }
-            response.body.string()
+            readLimited(response.body.byteStream(), limit)
         }
+    }
+
+    private fun readLimited(input: java.io.InputStream, limit: Int): String
+    {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        input.use {
+            while (true)
+            {
+                val read = it.read(buffer)
+                if (read < 0)
+                    break
+                require(output.size() + read <= limit) { "Response exceeds $limit bytes" }
+                output.write(buffer, 0, read)
+            }
+        }
+        return output.toString(Charsets.UTF_8.name())
     }
 
     private fun githubUrl(source: PackSource, suffix: String): String = "https://github.com".toHttpUrl().newBuilder()
