@@ -11,8 +11,9 @@ class PRConfig(private val project: Project) {
 
     fun getToken(testProps: Properties): String =
         project.findProperty("token")?.toString()
+            ?: System.getenv("GITHUB_TOKEN")
             ?: testProps.getProperty("token")
-            ?: throw IllegalStateException("GitHub token not found. Set 'token' property in gradle.properties or test.properties.")
+            ?: throw IllegalStateException("GitHub token not found. Set the token Gradle property, GITHUB_TOKEN, or test.properties.")
 
     fun getPRNumber(testProps: Properties): Int =
         project.findProperty("PR_NUMBER")?.toString()?.toIntOrNull()
@@ -30,4 +31,3 @@ class PRConfig(private val project: Project) {
         private const val TEST_PROPERTIES_FILE = "test.properties"
     }
 }
-

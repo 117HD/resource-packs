@@ -272,7 +272,9 @@ open class ManifestTask : DefaultTask() {
     }
 
     fun updateRepo() {
-        val token = project.property("token").toString()
+        val token = project.findProperty("token")?.toString()
+            ?: System.getenv("GITHUB_TOKEN")
+            ?: throw IllegalStateException("GitHub token not found. Set the token Gradle property or GITHUB_TOKEN.")
         val repoName = project.findProperty("REPO_NAME")?.toString()
             ?: System.getenv("REPO_NAME")
             ?: System.getenv("GITHUB_REPOSITORY")

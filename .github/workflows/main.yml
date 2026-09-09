@@ -1,12 +1,8 @@
 name: Manifest Updater
 
-permissions:
-  contents: write
-  pull-requests: write
-
 on:
   workflow_dispatch:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
     paths:
       - 'packs/**'
@@ -18,48 +14,50 @@ on:
 
 jobs:
   process-pr:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
-      - name: Checkout project sources
-        uses: actions/checkout@v4
+      - name: Checkout trusted project sources
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0
-          token: ${{ secrets.ACCESS_TOKEN }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'temurin'
-      
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
       
       - name: Make gradlew executable
         run: chmod +x ./gradlew
       
       - name: Process PR Comments and Labels
-        run: ./gradlew process-pr-comments -Ptoken=${{ secrets.ACCESS_TOKEN }} -PPR_NUMBER=${{ github.event.pull_request.number }} -PREPO_NAME=${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./gradlew process-pr-comments -PPR_NUMBER=${{ github.event.pull_request.number }} -PREPO_NAME=${{ github.repository }}
   
   update-manifest:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout project sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-          token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'temurin'
-      
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
       
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -79,9 +77,11 @@ jobs:
           fi
       
       - name: Update Manifest${{ steps.changed-files.outputs.packFile && ' [' || '' }}${{ steps.changed-files.outputs.packFile }}${{ steps.changed-files.outputs.packFile && ']' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -n "${{ steps.changed-files.outputs.packFile }}" ]; then
-            ./gradlew update-manifest -PpackFile="${{ steps.changed-files.outputs.packFile }}" -Ptoken=${{ secrets.ACCESS_TOKEN }}
+            ./gradlew update-manifest -PpackFile="${{ steps.changed-files.outputs.packFile }}"
           else
-            ./gradlew update-manifest -Ptoken=${{ secrets.ACCESS_TOKEN }}
+            ./gradlew update-manifest
           fi
