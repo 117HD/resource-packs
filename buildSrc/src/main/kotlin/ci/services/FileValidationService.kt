@@ -4,6 +4,7 @@ import Constants.BASE_GUTHUB_LINK_RAW
 import ci.config.Constants
 import ci.models.PackFileInfo
 import ci.models.PackProperties
+import ci.models.PackValidation
 import ci.Labels
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -23,13 +24,7 @@ class FileValidationService(private val client: OkHttpClient) {
         status: Labels,
         existingInternalNames: Set<String>
     ): List<String> = buildList {
-        if (packProps.displayName == null) {
-            add("displayName is required in pack.properties")
-        }
-
-        if (packProps.description == null) {
-            add("description is required in pack.properties")
-        }
+        addAll(PackValidation.requiredMetadataErrors(packProps))
 
         // The descriptor owns the stable identifier; a display name may change freely.
         if (status == Labels.ADDED && packInfo.internalName in existingInternalNames) {
@@ -43,10 +38,8 @@ class FileValidationService(private val client: OkHttpClient) {
         }
 
         if (fileExists("$baseUrl/settings.properties")) {
-            val is117Team = packProps.author?.contains(Constants.REQUIRED_117_TEAM, ignoreCase = true) == true
-            if (!is117Team) {
-                add("settings.properties is only allowed for 117 HD team packs")
-            }
+            if (!PackValidation.allowsSettings(packInfo.internalName))
+                add("settings.properties is not allowed for ${packInfo.internalName}")
         }
 
         if (fileExists("$baseUrl/icon.png")) {

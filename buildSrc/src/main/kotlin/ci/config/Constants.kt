@@ -1,7 +1,7 @@
 package ci.config
 
 object Constants {
-    const val DEFAULT_REPO_NAME = "117HD/resource-pack-hub"
+    const val DEFAULT_REPO_NAME = "117HD/resource-packs"
     const val COMMENT_TEMPLATE_RESOURCE = "comment-template.md"
     const val REQUIRED_117_TEAM = "117 HD"
     val ALLOWED_USERS = setOf("ahooder", "Mark7625")
@@ -14,4 +14,3 @@ object Constants {
     const val COMPACT_ICON_WIDTH = 222
     const val COMPACT_ICON_HEIGHT = 45
 }
-
