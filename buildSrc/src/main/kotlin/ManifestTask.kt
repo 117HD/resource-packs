@@ -1,318 +1,172 @@
-import Constants.BASE_GUTHUB_LINK
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.internal.lowercase
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.kohsuke.github.GitHub
-import java.io.File
 import java.io.StringReader
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.system.measureTimeMillis
-
+import java.util.Date
+import java.util.Locale
+import java.util.Properties
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 data class ManifestEntry(
     val hasIcon: Boolean,
     val hasCompactIcon: Boolean,
     val internalName: String,
-    val tags: List<String>? = null,
+    val tags: List<String> = emptyList(),
     val commit: String,
     val support: String? = null,
     val author: String? = null,
     val description: String? = null,
     val packType: String,
     val link: String,
-    val fileSize: Long? = null,
+    val fileSize: Long,
+    val sha256: String,
     val hasSettings: Boolean = false,
     val version: String? = null
 )
 
-data class Github(
-    val sha : String = "",
-    val files : Array<Files> = emptyArray(),
-    val commit : Commit
-)
+private data class PackSource(val internalName: String, val owner: String, val repository: String, val commit: String)
+private data class ArchiveInfo(val size: Long, val sha256: String)
 
-data class Files(
-    val sha : String = "",
-    val filename : String,
-    val raw_url : String
-)
-
-data class Commit(
-    val author: Author
-)
-
-data class Author(
-    val name : String
-)
-
-open class ManifestTask : DefaultTask() {
+open class ManifestTask : DefaultTask()
+{
+    companion object
+    {
+        private const val MANIFEST_BRANCH = "manifest"
+        private const val MAX_ARCHIVE_SIZE = 512L * 1024 * 1024
+        private val INTERNAL_NAME = Regex("[a-z0-9_-]+")
+        private val COMMIT = Regex("[0-9a-fA-F]{40}")
+        private val GITHUB_REPOSITORY = Regex("https://github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
+    }
 
     @Internal
-    val client : OkHttpClient = OkHttpClient()
-    @Internal
-    val validPack = emptyMap<File,Pair<String,String>>().toMutableMap()
-    @Internal
-    val failedPacks = emptyMap<String,MutableList<String>>().toMutableMap()
-    @Internal
-    val finalManifest = emptyMap<String,ManifestEntry>().toMutableMap()
+    val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .build()
 
     @TaskAction
-    fun generate() {
-        val specificPackFile = project.findProperty("packFile")?.toString()
-        val packFiles = if (specificPackFile != null) {
-            val file = File("./packs/$specificPackFile")
-            if (file.exists()) listOf(file) else {
-                System.err.println("Pack file not found: $specificPackFile")
-                emptyList()
-            }
-        } else {
-            File("./packs/").listFiles()?.toList() ?: emptyList()
-        }
+    fun generate()
+    {
+        val packFiles = project.file("packs").listFiles()?.filter { it.isFile }?.sortedBy { it.name } ?: emptyList()
+        require(packFiles.isNotEmpty()) { "No official pack descriptors were found" }
+        val entries = packFiles.map { generateEntry(readSource(it)) }.sortedBy { it.internalName }
+        require(entries.map { it.internalName }.distinct().size == entries.size) { "Pack internal names must be unique" }
+        updateRepo(entries)
+        println("Published ${entries.size} resource pack entries")
+    }
 
-        if (packFiles.isEmpty()) {
-            println("No pack files to process")
-            return
-        }
+    private fun readSource(file: java.io.File): PackSource
+    {
+        val properties = Properties().apply { file.inputStream().use(::load) }
+        val internalName = properties.getProperty("internalName")?.trim() ?: error("${file.name}: internalName is required")
+        require(INTERNAL_NAME.matches(internalName)) { "${file.name}: internalName may contain only lowercase letters, numbers, _ and -" }
+        val repositoryUrl = properties.getProperty("repository")?.trim() ?: error("${file.name}: repository is required")
+        val match = GITHUB_REPOSITORY.matchEntire(repositoryUrl)
+            ?: error("${file.name}: repository must be exactly https://github.com/owner/repository")
+        val commit = properties.getProperty("commit")?.trim() ?: error("${file.name}: commit is required")
+        require(COMMIT.matches(commit)) { "${file.name}: commit must be a full 40-character SHA-1" }
+        return PackSource(internalName, match.groupValues[1], match.groupValues[2], commit.toLowerCase(Locale.ROOT))
+    }
 
-        val time = measureTimeMillis {
-            var repoLink = ""
-            packFiles.forEach {
-                val packFile = Properties()
-                packFile.load(it.inputStream())
-                repoLink = packFile.getProperty("repository").substringAfter("https://github.com/")
-                val commit = packFile.getProperty("commit")
+    private fun generateEntry(source: PackSource): ManifestEntry
+    {
+        val resolvedCommit = Gson().fromJson(getText(apiUrl(source, "commits/${source.commit}")), Map::class.java)["sha"] as? String
+            ?: error("${source.internalName}: unable to resolve commit ${source.commit}")
+        require(resolvedCommit.equals(source.commit, ignoreCase = true)) { "${source.internalName}: GitHub resolved a different commit than requested" }
+        val properties = Properties().apply { load(StringReader(getText(rawUrl(source, "pack.properties")))) }
+        val displayName = properties.getProperty("displayName")?.trim()
+            ?: error("${source.internalName}: pack.properties must declare displayName")
+        val archive = downloadArchive(source)
+        return ManifestEntry(
+            hasIcon = exists(rawUrl(source, "icon.png")),
+            hasCompactIcon = exists(rawUrl(source, "compact-icon.png")),
+            internalName = source.internalName,
+            tags = properties.getProperty("tags")?.split(',')?.map(String::trim)?.filter(String::isNotEmpty) ?: emptyList(),
+            commit = resolvedCommit.toLowerCase(Locale.ROOT),
+            support = properties.getProperty("support")?.trim()?.takeIf(String::isNotEmpty),
+            author = properties.getProperty("author")?.trim()?.takeIf(String::isNotEmpty),
+            description = properties.getProperty("description")?.trim()?.takeIf(String::isNotEmpty),
+            packType = properties.getProperty("packType", "RESOURCE").trim(),
+            link = "https://github.com/${source.owner}/${source.repository}",
+            fileSize = archive.size,
+            sha256 = archive.sha256,
+            hasSettings = exists(rawUrl(source, "settings.properties")),
+            version = properties.getProperty("version")?.trim()?.takeIf(String::isNotEmpty)
+        ).also { println("${it.internalName}: $displayName (${archive.size} bytes)") }
+    }
 
-                val request = Request.Builder().url(
-                    "${BASE_GUTHUB_LINK}${repoLink}/commits/${commit}"
-                ).build()
-
-                val call = client.newCall(request)
-                val response = call.execute()
-                if (response.code == 200) {
-                    validPack[it] = Pair(repoLink, response.body.string())
-                    println("${it.name} - ${BASE_GUTHUB_LINK}${repoLink}/commits/${commit}")
-                } else {
-                    addError(
-                        it.nameWithoutExtension,
-                        "Unable to Find repo"
-                    )
-                    System.err.println("Unable to update: ${it.nameWithoutExtension} Code: ${response.code}")
+    private fun downloadArchive(source: PackSource): ArchiveInfo
+    {
+        val request = Request.Builder().url(githubUrl(source, "archive/${source.commit}.zip")).get().build()
+        return client.newCall(request).execute().use { response ->
+            require(response.isSuccessful) { "${source.internalName}: archive download failed (HTTP ${response.code})" }
+            val digest = MessageDigest.getInstance("SHA-256")
+            var size = 0L
+            response.body.byteStream().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true)
+                {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    size += read
+                    require(size <= MAX_ARCHIVE_SIZE) { "${source.internalName}: archive exceeds ${MAX_ARCHIVE_SIZE / 1024 / 1024} MiB" }
+                    digest.update(buffer, 0, read)
                 }
             }
-        }
-
-        // Use coroutines only when processing multiple packs
-        if (validPack.size > 1) {
-            runBlocking {
-                withContext(coroutineContext) {
-                    validPack.forEach {
-                        async(Dispatchers.IO) {
-                            val data = getData(it.value.first, it.value.second)
-                            if (data.second != null && data.first.isNotEmpty()) {
-                                finalManifest.put(data.second!!.internalName, data.second!!)
-                            } else {
-                                addError(
-                                    it.key.nameWithoutExtension,
-                                    data.first
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // Process single pack synchronously
-            validPack.forEach {
-                val data = getData(it.value.first, it.value.second)
-                if (data.second != null && data.first.isNotEmpty()) {
-                    finalManifest.put(data.second!!.internalName, data.second!!)
-                } else {
-                    addError(
-                        it.key.nameWithoutExtension,
-                        data.first
-                    )
-                }
-            }
-        }
-
-        updateRepo()
-
-        println("Manifest Updated in $time ms")
-    }
-
-
-    private fun addError(name : String, error : String) {
-        val list = failedPacks[name]?: emptyList<String>().toMutableList()
-        list.add(error)
-        failedPacks[name] = list
-    }
-
-    private fun getData(repo : String, content : String): Pair<String,ManifestEntry?> {
-        val gson = Gson()
-        val github = try {
-            gson.fromJson(content, Github::class.java)
-        } catch (e: Exception) {
-            return Pair("pack.properties is missing please add it", null)
-        }
-        if (github == null) {
-            return Pair("pack.properties is missing please add it", null)
-        }
-
-        val request = Request.Builder().url(
-            "${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/pack.properties"
-        ).build()
-
-        val response = client.newCall(request).execute()
-        if (response.code == 200) {
-
-            val foundIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/icon.png")
-            val foundSettings = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/settings.properties")
-            val foundCompactIcon = foundFile("${Constants.BASE_GUTHUB_LINK_RAW}${repo}/${github.sha}/compact-icon.png")
-
-            val properties = Properties()
-
-            properties.load(StringReader(response.body.string()))
-
-            val internalName = properties.getProperty("displayName").lowercase().replace(" ", "_")
-
-            val author = properties.getProperty("author").toString()
-
-            val version = properties.getProperty("version")
-            val support = properties.getProperty("support")
-            val description = properties.getProperty("description")
-            val packType = properties.getProperty("packType","RESOURCE")
-            val tags = properties.getProperty("tags").split(",")
-
-            return Pair(
-                " ", ManifestEntry(
-                    hasIcon = foundIcon,
-                    internalName = internalName,
-                    tags = tags,
-                    commit = github.sha,
-                    support = support,
-                    author = author,
-                    packType = packType,
-                    fileSize = downloadZipAndGetSize(repo,github.sha),
-                    description = description,
-                    link = "https://github.com/${repo}",
-                    hasCompactIcon = foundCompactIcon,
-                    hasSettings = foundSettings,
-                    version = version
-                )
-            )
-        }
-        return Pair("",null)
-
-
-    }
-
-    private fun downloadZipAndGetSize(repo: String, sha : String): Long? {
-        val zipUrl = "https://github.com".toHttpUrlOrNull()!!
-            .newBuilder()
-            .apply {
-                val parts = repo.split("/")
-                addPathSegment(parts[0])
-                addPathSegment(parts[1])
-            }
-            .addPathSegment("archive")
-            .addPathSegment("${sha}.zip")
-            .build()
-            .toString()
-
-
-
-        val request = Request.Builder().url(zipUrl).get().build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-
-            val body = response.body
-
-            val temp = File.createTempFile("pack-", ".zip")
-
-            body.byteStream().use { input ->
-                temp.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-
-            val size = temp.length()
-            temp.delete()
-
-            return size
+            ArchiveInfo(size, digest.digest().joinToString("") { "%02x".format(it) })
         }
     }
 
-    private fun foundFile(link: String): Boolean {
-        val request = Request.Builder().url(link).build()
-        client.newCall(request).execute().use { response ->
-            return response.code == 200
+    private fun exists(url: String): Boolean
+    {
+        val request = Request.Builder().url(url).head().build()
+        return client.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    private fun getText(url: String): String
+    {
+        val request = Request.Builder().url(url).get().build()
+        return client.newCall(request).execute().use { response ->
+            require(response.isSuccessful) { "Request failed for $url (HTTP ${response.code})" }
+            response.body.string()
         }
     }
 
-    fun Any.jsonToString(prettyPrint: Boolean): String {
-        val gson = if (prettyPrint) {
-            GsonBuilder().setPrettyPrinting().create()
-        } else {
-            Gson()
-        }
-        return gson.toJson(this)
+    private fun githubUrl(source: PackSource, suffix: String): String = "https://github.com".toHttpUrl().newBuilder()
+        .addPathSegment(source.owner).addPathSegment(source.repository).addPathSegments(suffix).build().toString()
+
+    private fun rawUrl(source: PackSource, path: String): String = "https://raw.githubusercontent.com".toHttpUrl().newBuilder()
+        .addPathSegment(source.owner).addPathSegment(source.repository).addPathSegment(source.commit).addPathSegments(path).build().toString()
+
+    private fun apiUrl(source: PackSource, path: String): String = "https://api.github.com/repos".toHttpUrl().newBuilder()
+        .addPathSegment(source.owner).addPathSegment(source.repository).addPathSegments(path).build().toString()
+
+    private fun updateRepo(entries: List<ManifestEntry>)
+    {
+        val token = project.findProperty("token")?.toString() ?: System.getenv("GITHUB_TOKEN")
+            ?: error("GitHub token not found. Set the token Gradle property or GITHUB_TOKEN.")
+        val repoName = project.findProperty("REPO_NAME")?.toString() ?: System.getenv("GITHUB_REPOSITORY") ?: "117HD/resource-packs"
+        val repo = GitHub.connectUsingOAuth(token).getRepository(repoName)
+        val content = entries.jsonToString(true)
+        val format = SimpleDateFormat("dd MMM yyyy HH:mm:ss z").apply { timeZone = TimeZone.getTimeZone("Europe/London") }
+        val message = "Update manifest.json ${format.format(Date())}"
+        val existing = runCatching { repo.getFileContent("manifest.json", MANIFEST_BRANCH) }.getOrNull()
+        if (existing == null)
+            repo.createContent().path("manifest.json").content(content).branch(MANIFEST_BRANCH).message(message).commit()
+        else
+            existing.update(content, message, MANIFEST_BRANCH)
     }
 
-    fun updateRepo() {
-        val token = project.findProperty("token")?.toString()
-            ?: System.getenv("GITHUB_TOKEN")
-            ?: throw IllegalStateException("GitHub token not found. Set the token Gradle property or GITHUB_TOKEN.")
-        val repoName = project.findProperty("REPO_NAME")?.toString()
-            ?: System.getenv("REPO_NAME")
-            ?: System.getenv("GITHUB_REPOSITORY")
-            ?: "117HD/resource-pack-hub"
-
-        val gh = GitHub.connectUsingOAuth(token)
-
-        val repo = try {
-            gh.getRepository(repoName)
-        } catch (e: Exception) {
-            throw IllegalStateException("Unable to load repository $repoName: ${e.message}", e)
-        }
-
-        val format = SimpleDateFormat("dd MMM yyyy HH:mm:ss z")
-        format.timeZone = TimeZone.getTimeZone("Europe/London")
-
-        // Load existing manifest to merge with new/updated packs
-        val existingManifest = try {
-            val manifestContent = repo.getFileContent("manifest.json", "manifest")
-            val gson = Gson()
-            val type = object : TypeToken<List<ManifestEntry>>() {}.type
-            val jsonString = manifestContent.read().bufferedReader().use { it.readText() }
-            val existingEntries: List<ManifestEntry>? = gson.fromJson(jsonString, type)
-            existingEntries?.associateBy { it.internalName }?.toMutableMap() ?: mutableMapOf()
-        } catch (e: Exception) {
-            System.err.println("Failed to load existing manifest: ${e.message}")
-            mutableMapOf()
-        }
-
-        // Merge new/updated packs into existing manifest
-        existingManifest.putAll(finalManifest)
-
-        repo.getFileContent("manifest.json", "manifest").update(
-            existingManifest.values.jsonToString(true),
-            "Update manifest.json ${format.format(GregorianCalendar.getInstance().time)}",
-            "manifest"
-        )
-    }
-
-
+    private fun Any.jsonToString(prettyPrint: Boolean): String =
+        (if (prettyPrint) GsonBuilder().setPrettyPrinting().create() else Gson()).toJson(this)
 }

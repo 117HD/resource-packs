@@ -62,26 +62,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
       
-      - name: Get changed pack file
-        id: changed-files
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            CHANGED_FILE=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep '^packs/' | head -n 1)
-            if [ -n "$CHANGED_FILE" ]; then
-              PACK_FILE=$(basename "$CHANGED_FILE")
-              echo "packFile=$PACK_FILE" >> $GITHUB_OUTPUT
-              echo "Found changed pack file: $PACK_FILE"
-            else
-              echo "No pack file changed, processing all packs"
-            fi
-          fi
-      
-      - name: Update Manifest${{ steps.changed-files.outputs.packFile && ' [' || '' }}${{ steps.changed-files.outputs.packFile }}${{ steps.changed-files.outputs.packFile && ']' || '' }}
+      - name: Rebuild manifest
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          if [ -n "${{ steps.changed-files.outputs.packFile }}" ]; then
-            ./gradlew update-manifest -PpackFile="${{ steps.changed-files.outputs.packFile }}"
-          else
-            ./gradlew update-manifest
-          fi
+        run: ./gradlew update-manifest
