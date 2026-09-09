@@ -44,6 +44,9 @@ jobs:
   update-manifest:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    concurrency:
+      group: resource-pack-manifest-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
