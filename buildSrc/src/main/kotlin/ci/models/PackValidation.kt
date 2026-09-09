@@ -7,6 +7,9 @@ object PackValidation {
     private val internalNamePattern = Regex("[a-z0-9_-]+")
     private val commitPattern = Regex("(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})")
     private val githubRepositoryPattern = Regex("https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+    private const val MAX_DISPLAY_NAME_LENGTH = 80
+    private const val MAX_AUTHOR_LENGTH = 120
+    private const val MAX_DESCRIPTION_LENGTH = 512
 
     fun readDescriptor(properties: Properties, source: String): PackFileInfo {
         val internalName = properties.getProperty("internalName")?.trim() ?: error("internalName property not found in $source")
@@ -23,6 +26,9 @@ object PackValidation {
         if (properties.displayName.isNullOrBlank()) add("displayName is required in pack.properties")
         if (properties.author.isNullOrBlank()) add("author is required in pack.properties")
         if (properties.description.isNullOrBlank()) add("description is required in pack.properties")
+        if (properties.displayName != null && properties.displayName.length > MAX_DISPLAY_NAME_LENGTH) add("displayName must be at most $MAX_DISPLAY_NAME_LENGTH characters")
+        if (properties.author != null && properties.author.length > MAX_AUTHOR_LENGTH) add("author must be at most $MAX_AUTHOR_LENGTH characters")
+        if (properties.description != null && properties.description.length > MAX_DESCRIPTION_LENGTH) add("description must be at most $MAX_DESCRIPTION_LENGTH characters")
     }
 
     fun allowsSettings(internalName: String): Boolean = internalName in settingsAllowedPacks

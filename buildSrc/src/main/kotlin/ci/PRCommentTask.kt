@@ -60,6 +60,7 @@ open class PRCommentTask : DefaultTask() {
 
         val prFile = getPRFile(pr)
         val status = determineStatus(prFile)
+        require(status != Labels.RENAMED) { "Renaming pack descriptors is not supported; submit a removal and addition instead" }
         val packFilePath = validatePackFilePath(prFile.filename)
 
         val packService = PackService(client)

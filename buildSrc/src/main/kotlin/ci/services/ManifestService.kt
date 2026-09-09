@@ -7,22 +7,18 @@ import okhttp3.Request
 
 class ManifestService(private val client: OkHttpClient) {
 
-    fun getExistingInternalNames(repoOwner: String, repoName: String): Set<String> = runCatching {
+    fun getExistingInternalNames(repoOwner: String, repoName: String): Set<String> {
         val manifestUrl = Constants.getManifestUrl(repoOwner, repoName)
         val request = Request.Builder().url(manifestUrl).build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@use emptySet<String>()
+        return client.newCall(request).execute().use { response ->
+            require(response.isSuccessful) { "Unable to fetch the existing manifest (HTTP ${response.code})" }
 
-            val json = response.body.string() ?: return@use emptySet<String>()
-            val jsonArray = JsonParser.parseString(json).asJsonArray ?: return@use emptySet<String>()
+            val jsonArray = JsonParser.parseString(response.body.string()).asJsonArray
+                ?: error("The existing manifest is not a JSON array")
 
             jsonArray.mapNotNull { jsonObj ->
                 jsonObj.asJsonObject.get("internalName")?.asString
             }.toSet()
         }
-    }.getOrElse {
-        System.err.println("Failed to fetch manifest.json: ${it.message}")
-        emptySet()
     }
 }
-
