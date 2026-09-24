@@ -2,6 +2,7 @@
   {
     "hasIcon": true,
     "hasCompactIcon": true,
+    "displayName": "Legacy Theatre of Blood",
     "internalName": "legacy_theatre_of_blood",
     "tags": [
       "Theatre of Blood",
@@ -12,30 +13,33 @@
     "support": "https://github.com/Mark7625/resource-packs/issues",
     "author": "117 HD",
     "description": "Previously, Theatre of Blood used to look a whole lot more blue. This option brings back that same old look.",
-    "packType": "ADDON",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 316980,
+    "fileSize": 315993,
+    "sha256": "b1cd0431de75a66adb072242582950d48c8d70937b9b789437e4cb107e2a27f8",
+    "hasSettings": false
+  },
+  {
+    "hasIcon": true,
+    "hasCompactIcon": false,
+    "displayName": "Minecraft",
+    "internalName": "minecraft",
+    "tags": [
+      "Textures",
+      "Minecraft"
+    ],
+    "commit": "a7f80fe6ad3a79779663cffac1d25b7ab75651fd",
+    "support": "https://github.com/Mark7625/resource-packs/issues",
+    "author": "Mark7625",
+    "description": "Make Runescape Look like Minecraft Faithful",
+    "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
+    "fileSize": 1720805,
+    "sha256": "82584b98215cdd2616ba106a33e6aca23e22a975093fa12f3c2b8d7753f74f58",
     "hasSettings": false
   },
   {
     "hasIcon": true,
     "hasCompactIcon": true,
-    "internalName": "vanilla+",
-    "tags": [
-      "Vanilla"
-    ],
-    "commit": "11957733fc62255c11d537f8d26c3dff4bd5aa4b",
-    "support": "https://github.com/Mark7625/resource-packs/issues",
-    "author": "117 HD",
-    "description": "Make 117 Look like Vanilla",
-    "packType": "RESOURCE",
-    "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 203071,
-    "hasSettings": true
-  },
-  {
-    "hasIcon": true,
-    "hasCompactIcon": true,
+    "displayName": "TzHaar Reskin",
     "internalName": "tzhaar_reskin",
     "tags": [
       "TzHaar",
@@ -46,27 +50,27 @@
     "commit": "a2de39c97f675ca88bda105332afb8d16059a5f8",
     "support": "https://github.com/Mark7625/resource-packs/issues",
     "author": "117 HD",
-    "description": "Reskins the TzHaar environment to match the orange graphics that were introduced with the HD update in RS3. ",
-    "packType": "ADDON",
+    "description": "Reskins the TzHaar environment to match the orange graphics that were introduced with the HD update in RS3.",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 240578,
+    "fileSize": 239879,
+    "sha256": "2a06cad7f5a3e9ae92c97e614ec87543491acdb820ab6e51775fba0e1dede162",
     "hasSettings": false
   },
   {
     "hasIcon": true,
-    "hasCompactIcon": false,
-    "internalName": "minecraft",
+    "hasCompactIcon": true,
+    "displayName": "Vanilla+",
+    "internalName": "vanilla-plus",
     "tags": [
-      "Textures",
-      "Minecraft"
+      "Vanilla"
     ],
-    "commit": "a7f80fe6ad3a79779663cffac1d25b7ab75651fd",
+    "commit": "11957733fc62255c11d537f8d26c3dff4bd5aa4b",
     "support": "https://github.com/Mark7625/resource-packs/issues",
-    "author": "Mark7625",
-    "description": "Make Runescape Look like Minecraft Faithful",
-    "packType": "RESOURCE",
+    "author": "117 HD",
+    "description": "Make 117 Look like Vanilla",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 1730768,
-    "hasSettings": false
+    "fileSize": 201987,
+    "sha256": "0c3d697eaab073d4d78ef7ea104a855ba88801506458bcf85de9c0d2a51da8a0",
+    "hasSettings": true
   }
 ]
