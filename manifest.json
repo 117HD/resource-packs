@@ -14,8 +14,8 @@
     "author": "117 HD",
     "description": "Previously, Theatre of Blood used to look a whole lot more blue. This option brings back that same old look.",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 315993,
-    "sha256": "b1cd0431de75a66adb072242582950d48c8d70937b9b789437e4cb107e2a27f8",
+    "fileSize": 316980,
+    "sha256": "a304e037e6afd892a8945568ff7372f82e1e2d6f08e58b1aa0db9b7449502314",
     "hasSettings": false
   },
   {
@@ -32,8 +32,8 @@
     "author": "Mark7625",
     "description": "Make Runescape Look like Minecraft Faithful",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 1720805,
-    "sha256": "82584b98215cdd2616ba106a33e6aca23e22a975093fa12f3c2b8d7753f74f58",
+    "fileSize": 1730768,
+    "sha256": "b64fc2206932f62103b899c7ac171b89eda3bd8d74acb776e1454027948aadcd",
     "hasSettings": false
   },
   {
@@ -52,8 +52,8 @@
     "author": "117 HD",
     "description": "Reskins the TzHaar environment to match the orange graphics that were introduced with the HD update in RS3.",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 239879,
-    "sha256": "2a06cad7f5a3e9ae92c97e614ec87543491acdb820ab6e51775fba0e1dede162",
+    "fileSize": 240578,
+    "sha256": "ef83c674df195e9eb425940d1e9e9542cf633786bf461e6057b9e3c5783566b5",
     "hasSettings": false
   },
   {
@@ -69,8 +69,8 @@
     "author": "117 HD",
     "description": "Make 117 Look like Vanilla",
     "link": "https://github.com/Mark7625/rlhd-custom-resource-packs",
-    "fileSize": 201987,
-    "sha256": "0c3d697eaab073d4d78ef7ea104a855ba88801506458bcf85de9c0d2a51da8a0",
+    "fileSize": 203071,
+    "sha256": "b0474be3c13f9ba82754988df8db1c4a495697509842f94a4a426efd7589c1fd",
     "hasSettings": true
   }
 ]
