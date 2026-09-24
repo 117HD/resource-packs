@@ -130,7 +130,18 @@ open class ManifestTask : DefaultTask()
             require(response.isSuccessful) { "${source.internalName}: archive download failed (HTTP ${response.code})" }
             val digest = MessageDigest.getInstance("SHA-256")
             val input = ValidatingArchiveInputStream(response.body.byteStream(), digest, source.internalName)
-            ZipInputStream(input).use { zip -> validateArchive(zip, source.internalName) }
+            // Shield `input` from ZipInputStream.close(), which would otherwise close the
+            // underlying stream before we can drain the remaining bytes below.
+            val shielded = object : FilterInputStream(input) {
+                override fun close() {}
+            }
+            ZipInputStream(shielded).use { zip -> validateArchive(zip, source.internalName) }
+            // ZipInputStream stops reading once it has parsed the local file entries, leaving the
+            // central directory / EOCD record (and any archive comment) unread. Drain the rest so
+            // size/sha256 reflect the full byte stream the real client downloads.
+            val drain = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (input.read(drain) >= 0) { /* drain remaining bytes */ }
+            input.close()
             ArchiveInfo(input.size, digest.digest().joinToString("") { "%02x".format(it) })
         }
     }
