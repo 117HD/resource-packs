@@ -45,6 +45,10 @@ commit=9db374fc205c5aae1f99bd5fd127266076f40ec8
 
 8. Be patient and wait for your pack to be reviewed and merged.
 
+If a submission doesn't pass automated validation (wrong branch, malformed
+descriptor, missing required pack files, etc.), the PR is automatically
+closed with a comment explaining why — just fix the issue and open a new one.
+
 ## Updating a pack
 
 To update a pack, change its descriptor's `commit` to the most recent complete Git commit hash (40-character SHA-1 or 64-character SHA-256). Do not change `internalName` when updating an existing pack.
