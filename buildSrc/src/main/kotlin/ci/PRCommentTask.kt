@@ -9,6 +9,7 @@ import ci.services.*
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import org.kohsuke.github.GHIssueState
 import org.kohsuke.github.GHPullRequest
 
 @OptIn(ExperimentalStdlibApi::class)
@@ -55,38 +56,68 @@ open class PRCommentTask : DefaultTask() {
         println("Processing PR #$prNumber from repository: ${actualRepo.fullName}")
         println("PR URL: ${pr.htmlUrl}")
         
-        require(pr.state != org.kohsuke.github.GHIssueState.CLOSED) { "PR #$prNumber is closed" }
-        println("PR #$prNumber state: ${pr.state}")
-
-        val prFile = getPRFile(pr)
-        val status = determineStatus(prFile)
-        require(status != Labels.RENAMED) { "Renaming pack descriptors is not supported; submit a removal and addition instead" }
-        val packFilePath = validatePackFilePath(prFile.filename)
-
-        val packService = PackService(client)
-
-        val headPackInfo = if (status == Labels.REMOVED) {
-            packService.readPackFile(actualRepo, packFilePath, pr.base.ref)
-        } else {
-            packService.readPackFile(actualRepo, packFilePath, pr.head.sha)
+        if (pr.state == GHIssueState.CLOSED) {
+            println("PR #$prNumber is already closed; nothing to validate")
+            return
         }
-        
-        validateCommit(headPackInfo, packFilePath, client)
 
-        val headPackProps = packService.readPackProperties(headPackInfo.repoLink, headPackInfo.commit)
+        try {
+            val prFile = getPRFile(pr)
+            val status = determineStatus(prFile)
+            require(status != Labels.RENAMED) { "Renaming pack descriptors is not supported; submit a removal and addition instead" }
+            val packFilePath = validatePackFilePath(prFile.filename)
 
-        val manifestService = ManifestService(client)
-        val repoOwner = actualRepo.ownerName
-        val repoName = actualRepo.name
-        val existingInternalNames = manifestService.getExistingInternalNames(repoOwner, repoName)
-        val fileValidationService = FileValidationService(client)
-        val validationErrors = fileValidationService.validateRequiredFiles(
-            headPackInfo, headPackProps, status, existingInternalNames
-        )
+            val packService = PackService(client)
 
-        require(validationErrors.isEmpty()) { "Pack validation failed: ${validationErrors.joinToString("; ")}" }
+            val headPackInfo = if (status == Labels.REMOVED) {
+                packService.readPackFile(actualRepo, packFilePath, pr.base.ref)
+            } else {
+                packService.readPackFile(actualRepo, packFilePath, pr.head.sha)
+            }
 
-        logSummary(prNumber, prFile.filename, status, headPackInfo)
+            validateCommit(headPackInfo, packFilePath, client)
+
+            val headPackProps = packService.readPackProperties(headPackInfo.repoLink, headPackInfo.commit)
+
+            val manifestService = ManifestService(client)
+            val repoOwner = actualRepo.ownerName
+            val repoName = actualRepo.name
+            val existingInternalNames = manifestService.getExistingInternalNames(repoOwner, repoName)
+            val fileValidationService = FileValidationService(client)
+            val validationErrors = fileValidationService.validateRequiredFiles(
+                headPackInfo, headPackProps, status, existingInternalNames
+            )
+
+            require(validationErrors.isEmpty()) { "Pack validation failed: ${validationErrors.joinToString("; ")}" }
+
+            logSummary(prNumber, prFile.filename, status, headPackInfo)
+        } catch (e: IllegalArgumentException) {
+            rejectSubmission(pr, e.message)
+            throw e
+        } catch (e: IllegalStateException) {
+            rejectSubmission(pr, e.message)
+            throw e
+        }
+    }
+
+    private fun rejectSubmission(pr: GHPullRequest, reason: String?) {
+        val message = buildString {
+            appendLine("This pull request can't be accepted as a resource pack submission:")
+            appendLine()
+            appendLine("> ${reason ?: "the submission failed validation"}")
+            appendLine()
+            appendLine(
+                "The `main` branch only accepts a single pack descriptor file at the root of the " +
+                    "repository (see the README for the exact format). If you meant to change build " +
+                    "tooling or CI, open your PR against the `ci` branch instead."
+            )
+            appendLine()
+            appendLine("Closing this PR automatically — feel free to open a new one once it's fixed.")
+        }
+        runCatching {
+            pr.comment(message)
+            pr.close()
+        }.onFailure { println("Failed to auto-close PR #${pr.number}: ${it.message}") }
     }
 
 

@@ -1,3 +1,4 @@
+import ci.BranchGuardTask
 import ci.PRCommentTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -11,6 +12,7 @@ class ManifestPlugin : Plugin<Project> {
             publish = false
         }
         tasks.register<PRCommentTask>("process-pr-comments")
+        tasks.register<BranchGuardTask>("guard-pr-branch")
     }
 
 }
