@@ -106,10 +106,8 @@ open class PRCommentTask : DefaultTask() {
         }
 
     fun validatePackFilePath(filePath: String): String {
-        require(filePath.startsWith("packs/")) { "File must be in packs/ directory: $filePath" }
-        val filename = filePath.removePrefix("packs/")
-        require(!filename.contains('/') && PackValidation.isSafeDescriptorFilename(filename)) {
-            "Pack descriptor must be directly inside packs/ and use only lowercase letters, numbers, _ and -: $filePath"
+        require(!filePath.contains('/') && PackValidation.isSafeDescriptorFilename(filePath)) {
+            "Pack descriptor must be a top-level file using only lowercase letters, numbers, _ and -: $filePath"
         }
         return filePath
     }

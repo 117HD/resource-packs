@@ -69,8 +69,9 @@ open class ManifestTask : DefaultTask()
     @TaskAction
     fun generate()
     {
-        val packFiles = project.file("packs").listFiles()
-            ?.filter { Files.isRegularFile(it.toPath(), LinkOption.NOFOLLOW_LINKS) }
+        val packsDir = project.findProperty("packsDir")?.toString() ?: "packs"
+        val packFiles = project.file(packsDir).listFiles()
+            ?.filter { Files.isRegularFile(it.toPath(), LinkOption.NOFOLLOW_LINKS) && PackValidation.isSafeDescriptorFilename(it.name) }
             ?.sortedBy { it.name }
             ?: emptyList()
         require(packFiles.isNotEmpty()) { "No official pack descriptors were found" }
