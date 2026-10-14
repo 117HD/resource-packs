@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
   pull_request_target:
     types: [opened, synchronize, reopened]
-    paths:
-      - 'packs/**'
+    paths-ignore:
+      - 'README.md'
   push:
     branches:
       - main
-    paths:
-      - 'packs/**'
+    paths-ignore:
+      - 'README.md'
 
 jobs:
   process-pr:
@@ -20,33 +20,36 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Checkout trusted project sources
+      - name: Checkout CI tooling
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ci
           persist-credentials: false
-      
+
       - name: Set up JDK
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'temurin'
-      
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-      
+
       - name: Process PR Comments and Labels
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./gradlew process-pr-comments -PPR_NUMBER=${{ github.event.pull_request.number }} -PREPO_NAME=${{ github.repository }}
 
-      - name: Validate merged pack manifest
+      - name: Fetch PR pack data
         run: |
           git fetch --no-tags origin +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/resource-pack-pr
           test "$(git rev-parse refs/remotes/origin/resource-pack-pr)" = "${{ github.event.pull_request.head.sha }}"
-          git checkout refs/remotes/origin/resource-pack-pr -- packs
-          ./gradlew validate-manifest
-  
+          mkdir -p pack-data
+          git archive refs/remotes/origin/resource-pack-pr | tar -x -C pack-data
+
+      - name: Validate merged pack manifest
+        run: ./gradlew validate-manifest -PpacksDir=pack-data
+
   update-manifest:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
@@ -56,22 +59,29 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout project sources
+      - name: Checkout CI tooling
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0
+          ref: ci
           persist-credentials: false
-      
+
       - name: Set up JDK
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           java-version: '17'
           distribution: 'temurin'
-      
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-      
+
+      - name: Checkout pack descriptors
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: pack-data
+          persist-credentials: false
+
       - name: Rebuild manifest
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./gradlew update-manifest
+        run: ./gradlew update-manifest -PpacksDir=pack-data
