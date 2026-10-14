@@ -22,7 +22,8 @@ class FileValidationService(private val client: OkHttpClient) {
         packInfo: PackFileInfo,
         packProps: PackProperties,
         status: Labels,
-        existingInternalNames: Set<String>
+        existingInternalNames: Set<String>,
+        baseUrl: String = "${BASE_GUTHUB_LINK_RAW}${packInfo.repoLink}/${packInfo.commit}"
     ): List<String> = buildList {
         addAll(PackValidation.requiredMetadataErrors(packProps))
 
@@ -30,8 +31,6 @@ class FileValidationService(private val client: OkHttpClient) {
         if (status == Labels.ADDED && packInfo.internalName in existingInternalNames) {
             add("${packInfo.internalName} is already in use; choose a new internalName")
         }
-
-        val baseUrl = "${BASE_GUTHUB_LINK_RAW}${packInfo.repoLink}/${packInfo.commit}"
 
         if (!fileExists("$baseUrl/licenses.txt")) {
             add("licenses.txt has not been found this is required")

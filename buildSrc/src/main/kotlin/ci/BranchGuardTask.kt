@@ -15,6 +15,18 @@ import org.kohsuke.github.GHIssueState
  */
 open class BranchGuardTask : DefaultTask() {
 
+    companion object {
+        /**
+         * True if [filename] has the shape of a pack descriptor (packs/<safe-name>, no
+         * nesting). Doesn't confirm the contents actually parse as a descriptor.
+         */
+        fun isCandidatePackDescriptorPath(filename: String): Boolean {
+            if (!filename.startsWith("packs/")) return false
+            val descriptorName = filename.removePrefix("packs/")
+            return !descriptorName.contains('/') && PackValidation.isSafeDescriptorFilename(descriptorName)
+        }
+    }
+
     @TaskAction
     fun guard() {
         val config = PRConfig(project)
@@ -39,12 +51,7 @@ open class BranchGuardTask : DefaultTask() {
         }
 
         val file = files.first()
-        if (!file.filename.startsWith("packs/")) {
-            println("PR #$prNumber changes ${file.filename}; treating as a regular code change")
-            return
-        }
-        val descriptorName = file.filename.removePrefix("packs/")
-        if (descriptorName.contains('/') || !PackValidation.isSafeDescriptorFilename(descriptorName)) {
+        if (!isCandidatePackDescriptorPath(file.filename)) {
             println("PR #$prNumber changes ${file.filename}; treating as a regular code change")
             return
         }

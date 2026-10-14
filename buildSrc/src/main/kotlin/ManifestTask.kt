@@ -40,7 +40,7 @@ data class ManifestEntry(
     val version: String? = null
 )
 
-private data class PackSource(val internalName: String, val owner: String, val repository: String, val commit: String)
+internal data class PackSource(val internalName: String, val owner: String, val repository: String, val commit: String)
 private data class ArchiveInfo(val size: Long, val sha256: String)
 
 open class ManifestTask : DefaultTask()
@@ -83,7 +83,7 @@ open class ManifestTask : DefaultTask()
         println("${if (publish) "Published" else "Validated"} ${entries.size} resource pack entries")
     }
 
-    private fun readSource(file: java.io.File): PackSource
+    internal fun readSource(file: java.io.File): PackSource
     {
         val properties = Properties().apply { file.inputStream().use(::load) }
         require(PackValidation.isSafeDescriptorFilename(file.name)) { "${file.name}: descriptor filenames may contain only lowercase letters, numbers, _ and -" }
@@ -174,7 +174,7 @@ open class ManifestTask : DefaultTask()
         require(packProperties == 1) { "$internalName: archive must contain exactly one pack.properties" }
     }
 
-    private fun isSafeArchivePath(path: String): Boolean {
+    internal fun isSafeArchivePath(path: String): Boolean {
         val normalized = path.removeSuffix("/")
         return normalized.isNotEmpty()
             && !normalized.startsWith('/')
@@ -182,7 +182,7 @@ open class ManifestTask : DefaultTask()
             && normalized.split('/').none { it.isEmpty() || it == "." || it == ".." }
     }
 
-    private fun parseTags(rawTags: String?, internalName: String): List<String> {
+    internal fun parseTags(rawTags: String?, internalName: String): List<String> {
         val tags = rawTags?.split(',')?.map(String::trim)?.filter(String::isNotEmpty) ?: emptyList()
         require(tags.size <= 12) { "$internalName: pack has too many tags" }
         require(tags.all { it.length <= 40 }) { "$internalName: pack tags must be at most 40 characters" }
