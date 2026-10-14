@@ -76,11 +76,15 @@ open class ManifestTask : DefaultTask()
             ?: emptyList()
         require(packFiles.isNotEmpty()) { "No official pack descriptors were found" }
         val entries = packFiles.map { generateEntry(readSource(it)) }.sortedBy { it.internalName }
-        require(entries.map { it.internalName }.distinct().size == entries.size) { "Pack internal names must be unique" }
-        require(entries.map { it.sha256 }.distinct().size == entries.size) { "Official packs must not share an archive SHA-256" }
+        requireUniqueEntries(entries)
         if (publish)
             updateRepo(entries)
         println("${if (publish) "Published" else "Validated"} ${entries.size} resource pack entries")
+    }
+
+    internal fun requireUniqueEntries(entries: List<ManifestEntry>) {
+        require(entries.map { it.internalName }.distinct().size == entries.size) { "Pack internal names must be unique" }
+        require(entries.map { it.sha256 }.distinct().size == entries.size) { "Official packs must not share an archive SHA-256" }
     }
 
     internal fun readSource(file: java.io.File): PackSource
@@ -147,7 +151,13 @@ open class ManifestTask : DefaultTask()
         }
     }
 
-    private fun validateArchive(zip: ZipInputStream, internalName: String) {
+    internal fun validateArchive(
+        zip: ZipInputStream,
+        internalName: String,
+        maxEntries: Int = MAX_ARCHIVE_ENTRIES,
+        maxEntrySize: Long = MAX_ARCHIVE_ENTRY_SIZE,
+        maxUncompressedSize: Long = MAX_ARCHIVE_UNCOMPRESSED_SIZE
+    ) {
         val names = mutableSetOf<String>()
         var entries = 0
         var uncompressedSize = 0L
@@ -155,7 +165,7 @@ open class ManifestTask : DefaultTask()
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         while (true) {
             val entry = zip.nextEntry ?: break
-            require(++entries <= MAX_ARCHIVE_ENTRIES) { "$internalName: archive has too many entries" }
+            require(++entries <= maxEntries) { "$internalName: archive has too many entries" }
             require(isSafeArchivePath(entry.name)) { "$internalName: archive contains an unsafe entry path" }
             require(names.add(entry.name)) { "$internalName: archive contains duplicate entries" }
             if (!entry.isDirectory && (entry.name == "pack.properties" || entry.name.endsWith("/pack.properties")))
@@ -166,8 +176,8 @@ open class ManifestTask : DefaultTask()
                 if (read < 0) break
                 entrySize += read
                 uncompressedSize += read
-                require(entrySize <= MAX_ARCHIVE_ENTRY_SIZE) { "$internalName: archive entry is too large" }
-                require(uncompressedSize <= MAX_ARCHIVE_UNCOMPRESSED_SIZE) { "$internalName: archive expands beyond the allowed size" }
+                require(entrySize <= maxEntrySize) { "$internalName: archive entry is too large" }
+                require(uncompressedSize <= maxUncompressedSize) { "$internalName: archive expands beyond the allowed size" }
             }
             zip.closeEntry()
         }
@@ -190,7 +200,12 @@ open class ManifestTask : DefaultTask()
         return tags
     }
 
-    private class ValidatingArchiveInputStream(input: java.io.InputStream, private val digest: MessageDigest, private val internalName: String) : FilterInputStream(input) {
+    internal class ValidatingArchiveInputStream(
+        input: java.io.InputStream,
+        private val digest: MessageDigest,
+        private val internalName: String,
+        private val maxSize: Long = MAX_ARCHIVE_SIZE
+    ) : FilterInputStream(input) {
         var size = 0L
             private set
 
@@ -208,7 +223,7 @@ open class ManifestTask : DefaultTask()
 
         private fun record(buffer: ByteArray, offset: Int = 0, length: Int = buffer.size) {
             size += length
-            require(size <= MAX_ARCHIVE_SIZE) { "$internalName: archive exceeds ${MAX_ARCHIVE_SIZE / 1024 / 1024} MiB" }
+            require(size <= maxSize) { "$internalName: archive exceeds ${maxSize / 1024 / 1024} MiB" }
             digest.update(buffer, offset, length)
         }
     }

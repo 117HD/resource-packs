@@ -1,4 +1,5 @@
 import org.gradle.testfixtures.ProjectBuilder
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -142,5 +143,57 @@ class ManifestTaskTest {
             "internalName=my_pack\nrepository=https://github.com/owner/repo\ncommit=not-a-hash\n"
         )
         assertThrows(IllegalArgumentException::class.java) { task.readSource(file) }
+    }
+
+    // --- requireUniqueEntries ---
+
+    private fun entry(internalName: String, sha256: String) = ManifestEntry(
+        hasIcon = false,
+        hasCompactIcon = false,
+        displayName = "Display",
+        internalName = internalName,
+        commit = "a".repeat(40),
+        link = "https://github.com/owner/repo",
+        fileSize = 1,
+        sha256 = sha256
+    )
+
+    @Test
+    fun `requireUniqueEntries passes for distinct names and hashes`() {
+        assertDoesNotThrow {
+            task.requireUniqueEntries(
+                listOf(entry("pack_one", "a".repeat(64)), entry("pack_two", "b".repeat(64)))
+            )
+        }
+    }
+
+    @Test
+    fun `requireUniqueEntries rejects a duplicate internalName`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            task.requireUniqueEntries(
+                listOf(entry("same_name", "a".repeat(64)), entry("same_name", "b".repeat(64)))
+            )
+        }
+        assertEquals("Pack internal names must be unique", ex.message)
+    }
+
+    @Test
+    fun `requireUniqueEntries rejects packs sharing an archive sha256`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            task.requireUniqueEntries(
+                listOf(entry("pack_one", "a".repeat(64)), entry("pack_two", "a".repeat(64)))
+            )
+        }
+        assertEquals("Official packs must not share an archive SHA-256", ex.message)
+    }
+
+    @Test
+    fun `requireUniqueEntries passes for a single entry`() {
+        assertDoesNotThrow { task.requireUniqueEntries(listOf(entry("only_pack", "a".repeat(64)))) }
+    }
+
+    @Test
+    fun `requireUniqueEntries passes for an empty list`() {
+        assertDoesNotThrow { task.requireUniqueEntries(emptyList()) }
     }
 }

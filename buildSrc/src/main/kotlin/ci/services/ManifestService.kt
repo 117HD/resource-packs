@@ -7,8 +7,11 @@ import okhttp3.Request
 
 class ManifestService(private val client: OkHttpClient) {
 
-    fun getExistingInternalNames(repoOwner: String, repoName: String): Set<String> {
-        val manifestUrl = Constants.getManifestUrl(repoOwner, repoName)
+    fun getExistingInternalNames(
+        repoOwner: String,
+        repoName: String,
+        manifestUrl: String = Constants.getManifestUrl(repoOwner, repoName)
+    ): Set<String> {
         val request = Request.Builder().url(manifestUrl).build()
         return client.newCall(request).execute().use { response ->
             require(response.isSuccessful) { "Unable to fetch the existing manifest (HTTP ${response.code})" }

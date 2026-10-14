@@ -119,7 +119,7 @@ class SizeCalculationService(private val client: OkHttpClient) {
         }
     }
 
-    private fun mapFileCountToLabel(fileCount: Int): Labels = when {
+    internal fun mapFileCountToLabel(fileCount: Int): Labels = when {
         fileCount < 10 -> Labels.SIZE_XS
         fileCount < 50 -> Labels.SIZE_S
         fileCount < 200 -> Labels.SIZE_M
