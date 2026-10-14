@@ -1,45 +1,16 @@
 ![](https://avatars.githubusercontent.com/u/108533386?s=200&v=4)
-# resource-packs
+# resource-packs (ci branch)
 
-This repository contains officially recognized resource packs for 117 HD.
+This branch holds the build tooling (Gradle wrapper, `buildSrc`, and the
+`gradlew`-driven manifest/PR-validation tasks) used to publish the
+`manifest` branch from the pack descriptors kept on `main`.
 
-## Creating new Resource Pack
-There are two methods to create an external pack, you can either:
+It intentionally does not contain any pack descriptors. The `main` branch
+is a flat directory of pack descriptor files plus its own README aimed at
+contributors; this branch is pulled in by the workflow on `main` purely to
+run the Gradle tasks (`update-manifest`, `validate-manifest`,
+`process-pr-comments`) against the descriptors checked out from `main`.
 
-- Use [this](https://github.com/Mark7625/resource-packs/generate) pack template.
-- Make a new public repo and add your files to your git repo and push the project.
-
-## Development
-
-[How to design a pack](https://github.com/117HD/RLHD/wiki/v1.1.2-Update-Changelog#environments)
-
-
-## Submitting a resource pack
-1. Fork the [resource-packs repository](https://github.com/117HD/resource-packs).
-2. Create a new branch for your pack.
-3. Create a new file directly in the `packs` directory with the fields:
- ```
-internalName=
-repository=
-commit=
- ```
-   `internalName` is the stable identifier used by the client. It must be unique and contain only lowercase letters, numbers, `_`, and `-`. It is not the pack's display name.
-
-4. To get the repository URL, copy the exact repository URL from the address bar. It must be in the form `https://github.com/owner/repository`, without a trailing slash or any additional path.
-
-5. To get the commit hash, go to your pack repository on GitHub and click on commits. Choose the latest one and copy the complete hash. It must be either a 40-character Git SHA-1 or a 64-character SHA-256. Paste this into the `commit=` field of the file.
-   Your file should now look something like this:
- ```
-internalName=my_resource_pack
-repository=https://github.com/Mark7625/resource-packs
-commit=9db374fc205c5aae1f99bd5fd127266076f40ec8
- ```
-6. This is the only change you need to make, so commit your changes and push them to your fork. Then go back to the [resource-packs repository](https://github.com/117HD/resource-packs) and click *New pull request* in the upper left. Choose *Compare across forks* and select your fork and branch as head and compare.
-
-7. Write a short description of what your pack does and then create your pull request.
-
-8. Be patient and wait for your pack to be reviewed and merged.
-
-## Updating a pack
-
-To update a pack, change its descriptor's `commit` to the most recent complete Git commit hash (40-character SHA-1 or 64-character SHA-256). Do not change `internalName` when updating an existing pack.
+There's no reason to open PRs against pack submissions here — those go to
+`main`. Changes to the tooling itself (buildSrc, workflow logic, Gradle
+config) belong on this branch.
