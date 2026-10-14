@@ -6,7 +6,7 @@ This branch holds the build tooling (Gradle wrapper, `buildSrc`, and the
 `manifest` branch from the pack descriptors kept on `main`.
 
 It intentionally does not contain any pack descriptors. The `main` branch
-is a flat directory of pack descriptor files plus its own README aimed at
+keeps pack descriptor files under `packs/` plus its own README aimed at
 contributors; this branch is pulled in by the workflow on `main` purely to
 run the Gradle tasks (`update-manifest`, `validate-manifest`,
 `process-pr-comments`) against the descriptors checked out from `main`.

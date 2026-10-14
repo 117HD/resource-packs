@@ -39,7 +39,12 @@ open class BranchGuardTask : DefaultTask() {
         }
 
         val file = files.first()
-        if (file.filename.contains('/') || !PackValidation.isSafeDescriptorFilename(file.filename)) {
+        if (!file.filename.startsWith("packs/")) {
+            println("PR #$prNumber changes ${file.filename}; treating as a regular code change")
+            return
+        }
+        val descriptorName = file.filename.removePrefix("packs/")
+        if (descriptorName.contains('/') || !PackValidation.isSafeDescriptorFilename(descriptorName)) {
             println("PR #$prNumber changes ${file.filename}; treating as a regular code change")
             return
         }
