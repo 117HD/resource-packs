@@ -22,7 +22,7 @@ There are two methods to create an external pack, you can either:
 ## Submitting a resource pack
 1. Fork the [resource-packs repository](https://github.com/117HD/resource-packs).
 2. Create a new branch for your pack.
-3. Create a new file directly in the root of the repository with the fields:
+3. Create a new file directly in the `packs` directory with the fields:
  ```
 internalName=
 repository=

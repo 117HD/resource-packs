@@ -48,7 +48,7 @@ jobs:
           git archive refs/remotes/origin/resource-pack-pr | tar -x -C pack-data
 
       - name: Validate merged pack manifest
-        run: ./gradlew validate-manifest -PpacksDir=pack-data
+        run: ./gradlew validate-manifest -PpacksDir=pack-data/packs
 
   update-manifest:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -84,4 +84,4 @@ jobs:
       - name: Rebuild manifest
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./gradlew update-manifest -PpacksDir=pack-data
+        run: ./gradlew update-manifest -PpacksDir=pack-data/packs
