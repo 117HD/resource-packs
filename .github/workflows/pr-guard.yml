@@ -1,0 +1,35 @@
+name: Guard CI Branch
+
+# Lives only on the ci branch: pull_request_target resolves its workflow file
+# from the PR's base branch, so this only ever runs for PRs targeting ci.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CI tooling
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ci
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Reject misdirected pack submissions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./gradlew guard-pr-branch -PPR_NUMBER=${{ github.event.pull_request.number }} -PREPO_NAME=${{ github.repository }}
